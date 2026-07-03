@@ -20,39 +20,32 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    # PARTICIPANT TODO: Update the port mapping below once your backend is ready
     ports:
       - "3000:3000"
     volumes:
       - ./backend:/app
+      - /app/node_modules
     # Ensure backend restarts if it crashes
     restart: unless-stopped
-    # PARTICIPANT TODO: (Optional) If you add a database service, uncomment the lines below so the backend configures it
-    # environment:
-    #   - DB_URL=jdbc:postgresql://db:5432/event_platform
-    #   - DB_USER=admin
-    #   - DB_PASS=adminpassword
-    # depends_on:
-    #   - db
+    environment:
+      - DATABASE_URL=postgresql://admin:adminpassword@db:5432/finance_app?schema=public
+      - JWT_SECRET=unlockd-hackathon-jwt-secret-2026
+    depends_on:
+      - db
 
-  # =======================================================================
-  # PARTICIPANT TODO: (Optional) Database Service Example
-  # =======================================================================
-  # If your project requires a database (SQL, NoSQL, etc.), you can add it here.
-  # Here is an example of adding a PostgreSQL service (you could also use MongoDB, MySQL, etc.):
-  # 
-  # db:
-  #   image: postgres:15-alpine
-  #   container_name: event_db
-  #   environment:
-  #     POSTGRES_USER: admin
-  #     POSTGRES_PASSWORD: adminpassword
-  #     POSTGRES_DB: event_platform
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - db_data:/var/lib/postgresql/data
+  db:
+    image: postgres:15-alpine
+    container_name: finance_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: finance_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
-# PARTICIPANT TODO: (Optional) If you added a database with a volume above, declare the volume here:
-# volumes:
-#   db_data:
+volumes:
+  db_data:
+

@@ -1,0 +1,40 @@
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import authRoutes from './routes/authRoutes';
+import accountRoutes from './routes/accountRoutes';
+import transactionRoutes from './routes/transactionRoutes';
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Enable Cross-Origin Resource Sharing (CORS) for frontend interaction
+app.use(cors({
+  origin: '*', // Allow all origins for the build-a-thon, or customize if necessary
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Parse JSON request bodies
+app.use(express.json());
+
+// Register API Routes
+app.use('/auth', authRoutes);
+app.use('/accounts', accountRoutes);
+app.use('/transactions', transactionRoutes);
+
+// Global Error Handling Middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error("Global Error Handler Log:", err);
+  
+  const statusCode = err.status || 500;
+  const message = err.message || "An unexpected internal server error occurred";
+  
+  return res.status(statusCode).json({
+    error: message
+  });
+});
+
+// Start the Express server
+app.listen(PORT, () => {
+  console.log(`Backend server is running on port ${PORT}`);
+});
