@@ -29,7 +29,9 @@ export const createTransactionSchema = z.object({
   }).positive("Transfer amount must be greater than zero"),
   idempotencyKey: z.string({
     required_error: "Idempotency key is required"
-  }).trim().min(1, "Idempotency key cannot be empty")
+  }).trim().min(1, "Idempotency key cannot be empty"),
+  description: z.string().trim().optional(),
+  categoryId: z.string().uuid("Category ID must be a valid UUID").optional()
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
   message: "Sender and recipient accounts must be different",
   path: ["toAccountId"] // attach error to toAccountId
@@ -204,4 +206,66 @@ export const paySettlementSchema = z.object({
   }).uuid("Account ID must be a valid UUID")
 });
 
+const recordsQueryBaseSchema = z.object({
+  q: z.string().trim().optional(),
+  startDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "startDate must be a valid date string" }).optional(),
+  endDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "endDate must be a valid date string" }).optional(),
+  categoryId: z.string().uuid("categoryId must be a valid UUID").optional(),
+  minAmount: z.preprocess((val) => (val === undefined || val === '' ? undefined : Number(val)), z.number().nonnegative().optional()),
+  maxAmount: z.preprocess((val) => (val === undefined || val === '' ? undefined : Number(val)), z.number().nonnegative().optional()),
+  accountId: z.string().uuid("accountId must be a valid UUID").optional(),
+  type: z.enum(["TRANSFER", "EXPENSE"], {
+    invalid_type_error: "type must be either TRANSFER or EXPENSE"
+  }).optional(),
+  page: z.preprocess((val) => (val === undefined || val === '' ? undefined : Number(val)), z.number().int().positive().optional().default(1)),
+  pageSize: z.preprocess((val) => (val === undefined || val === '' ? undefined : Number(val)), z.number().int().positive().optional().default(25))
+});
 
+const validateRecordQueryRange = (data: z.infer<typeof recordsQueryBaseSchema>, ctx: z.RefinementCtx) => {
+  if (data.minAmount !== undefined && data.maxAmount !== undefined) {
+    if (data.minAmount > data.maxAmount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "minAmount must be less than or equal to maxAmount",
+        path: ["minAmount"]
+      });
+    }
+  }
+  if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "startDate must be before or equal to endDate",
+      path: ["startDate"]
+    });
+  }
+};
+
+/**
+ * Validation schema for GET /records query parameters
+ */
+export const recordsQuerySchema = recordsQueryBaseSchema.superRefine(validateRecordQueryRange);
+
+/**
+ * Validation schema for GET /records/export query parameters
+ */
+export const recordsExportQuerySchema = recordsQueryBaseSchema.extend({
+  format: z.enum(["csv", "pdf"], {
+    invalid_type_error: "format must be either csv or pdf"
+  }).default("csv")
+}).superRefine(validateRecordQueryRange);
+
+/**
+ * Validation schema for PATCH /transactions/:id/categorize
+ */
+export const categorizeTransactionSchema = z.object({
+  description: z.string().trim().nullable().optional(),
+  categoryId: z.string().uuid("Category ID must be a valid UUID").nullable().optional()
+}).superRefine((data, ctx) => {
+  if (data.description === undefined && data.categoryId === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one field (description or categoryId) must be provided for update",
+      path: ["description"]
+    });
+  }
+});

@@ -9,6 +9,7 @@ import budgetRoutes from './routes/budgetRoutes';
 import groupRoutes from './routes/groupRoutes';
 import groupExpenseRoutes from './routes/groupExpenseRoutes';
 import settlementRoutes from './routes/settlementRoutes';
+import recordsRoutes from './routes/recordsRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +34,7 @@ app.use('/budgets', budgetRoutes);
 app.use('/groups', groupRoutes);
 app.use('/groups', groupExpenseRoutes);
 app.use('/', settlementRoutes);
+app.use('/records', recordsRoutes);
 
 // Global Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

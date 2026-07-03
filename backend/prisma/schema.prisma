@@ -53,21 +53,25 @@ model Transaction {
   status          TransactionStatus
   idempotencyKey  String            @unique
   createdAt       DateTime          @default(now())
+  description     String?
+  categoryId      String?
 
   fromAccount     Account           @relation("FromAccount", fields: [fromAccountId], references: [id])
   toAccount       Account           @relation("ToAccount", fields: [toAccountId], references: [id])
+  category        Category?         @relation(fields: [categoryId], references: [id])
   settlement      Settlement?
 }
 
 model Category {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  createdAt DateTime @default(now())
+  id           String        @id @default(uuid())
+  userId       String
+  name         String
+  createdAt    DateTime      @default(now())
 
-  user      User      @relation(fields: [userId], references: [id])
-  expenses  Expense[]
-  budgets   Budget[]
+  user         User          @relation(fields: [userId], references: [id])
+  expenses     Expense[]
+  budgets      Budget[]
+  transactions Transaction[]
 
   @@unique([userId, name])
 }

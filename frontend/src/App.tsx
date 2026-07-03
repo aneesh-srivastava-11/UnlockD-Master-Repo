@@ -8,6 +8,7 @@ import { Dashboard } from './app/Dashboard';
 import { SettingsPage } from './app/SettingsPage';
 import { GroupsPage } from './app/GroupsPage';
 import { GroupDetailsPage } from './app/GroupDetailsPage';
+import { HistoryPage } from './app/HistoryPage';
 import './App.css';
 
 function App() {
@@ -54,6 +55,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <GroupDetailsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute>
+                    <HistoryPage />
                   </ProtectedRoute>
                 }
               />
