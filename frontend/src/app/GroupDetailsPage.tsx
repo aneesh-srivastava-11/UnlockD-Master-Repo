@@ -68,10 +68,6 @@ interface UserAccount {
   balance: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-}
 
 export const GroupDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -108,11 +104,6 @@ export const GroupDetailsPage: React.FC = () => {
   // Auto Prompt Modal for Creator Share
   const [creatorPromptOpen, setCreatorPromptOpen] = useState(false);
   const [creatorShareToLog, setCreatorShareToLog] = useState<number>(0);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [logCategoryId, setLogCategoryId] = useState('');
-  const [logAccountId, setLogAccountId] = useState('');
-  const [loggingExpense, setLoggingExpense] = useState(false);
-  const [logError, setLogError] = useState<string | null>(null);
 
   const fetchGroupDetails = async () => {
     setLoading(true);
@@ -136,29 +127,15 @@ export const GroupDetailsPage: React.FC = () => {
       setUserAccounts(data);
       if (data.length > 0) {
         setSelectedPayAccountId(data[0].id);
-        setLogAccountId(data[0].id);
       }
     } catch (err) {
       console.error('Failed to load accounts for payments', err);
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const data = await apiClient<Category[]>('/categories');
-      setCategories(data);
-      if (data.length > 0) {
-        setLogCategoryId(data[0].id);
-      }
-    } catch (err) {
-      console.error('Failed to load categories', err);
-    }
-  };
-
   useEffect(() => {
     fetchGroupDetails();
     fetchUserAccounts();
-    fetchCategories();
   }, [id]);
 
   // Handle Add Member
@@ -297,29 +274,7 @@ export const GroupDetailsPage: React.FC = () => {
     }
   };
 
-  // Creator logs their own share as personal Expense
-  const handleLogCreatorExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLogError(null);
-    setLoggingExpense(true);
 
-    try {
-      await apiClient('/expenses', {
-        method: 'POST',
-        bodyData: {
-          accountId: logAccountId,
-          categoryId: logCategoryId,
-          amount: creatorShareToLog,
-          description: `Group Share: ${group?.name || 'Group'}`
-        }
-      });
-      setCreatorPromptOpen(false);
-    } catch (err: any) {
-      setLogError(err.message || 'Failed to log personal expense.');
-    } finally {
-      setLoggingExpense(false);
-    }
-  };
 
   if (loading) {
     return <div className="py-16 text-center text-text-secondary text-sm">Loading group details...</div>;
@@ -694,80 +649,26 @@ export const GroupDetailsPage: React.FC = () => {
       {/* Group Fully Settled Creator share log Modal */}
       <Dialog 
         open={creatorPromptOpen} 
-        onOpenChange={() => {}} // Empty onOpenChange to enforce user action
+        onOpenChange={(open) => { if (!open) setCreatorPromptOpen(false); }}
       >
-        <DialogContent 
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <form onSubmit={handleLogCreatorExpense}>
-            <DialogHeader className="mb-4">
-              <DialogTitle>Log Your Share of Expenses</DialogTitle>
-              <DialogDescription>
-                This group is fully settled! As the creator, you paid the total sum externally. 
-                Please log your own personal share of ₹{creatorShareToLog.toFixed(2)} as a personal Expense to keep your dashboard reports accurate.
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent>
+          <DialogHeader className="mb-4">
+            <DialogTitle>Group Fully Settled!</DialogTitle>
+            <DialogDescription>
+              All settlements are paid and completed. 
+              Your personal expense share of ₹{creatorShareToLog.toFixed(2)} has been automatically logged under your <strong>Settlement</strong> category to keep your dashboard reports accurate.
+            </DialogDescription>
+          </DialogHeader>
 
-            {logError && (
-              <div className="p-3 text-xs rounded bg-danger/10 border border-danger text-danger mb-4">
-                {logError}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-4 mb-6">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="creator-log-account">Select Source Account</Label>
-                <Select value={logAccountId} onValueChange={setLogAccountId} disabled={loggingExpense}>
-                  <SelectTrigger id="creator-log-account">
-                    <SelectValue placeholder="Select account..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {userAccounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        {acc.name} (₹{parseFloat(acc.balance).toFixed(2)})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="creator-log-category">Select Spending Category</Label>
-                <Select value={logCategoryId} onValueChange={setLogCategoryId} disabled={loggingExpense}>
-                  <SelectTrigger id="creator-log-category">
-                    <SelectValue placeholder="Select category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <DialogFooter className="flex-row sm:justify-end gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setCreatorPromptOpen(false)}
-                disabled={loggingExpense}
-                className="flex-1 sm:flex-none h-11"
-              >
-                Skip for now
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={loggingExpense || userAccounts.length === 0 || categories.length === 0}
-                className="flex-1 sm:flex-none h-11"
-              >
-                {loggingExpense ? 'Logging Expense...' : 'Log Expense'}
-              </Button>
-            </DialogFooter>
-          </form>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              onClick={() => setCreatorPromptOpen(false)}
+              className="w-full sm:w-auto h-11"
+            >
+              Great, thanks!
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

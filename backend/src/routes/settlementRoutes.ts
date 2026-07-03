@@ -247,6 +247,46 @@ router.post('/settlements/:id/pay', async (req: AuthenticatedRequest, res: Respo
       });
       const creatorShare = creatorSplits.reduce((sum, split) => sum + parseFloat(split.shareAmount.toString()), 0);
 
+      // Automatically log the creator's share under the "Settlement" category using their primary account
+      if (creatorShare > 0.009) {
+        const creatorAccount = await prisma.account.findFirst({
+          where: { userId: group.createdBy },
+          orderBy: { createdAt: 'asc' }
+        });
+
+        if (creatorAccount) {
+          let creatorCategory = await prisma.category.findFirst({
+            where: {
+              userId: group.createdBy,
+              name: {
+                equals: 'Settlement',
+                mode: 'insensitive'
+              }
+            }
+          });
+
+          if (!creatorCategory) {
+            creatorCategory = await prisma.category.create({
+              data: {
+                userId: group.createdBy,
+                name: 'Settlement'
+              }
+            });
+          }
+
+          // Create the personal expense record for the creator
+          await prisma.expense.create({
+            data: {
+              userId: group.createdBy,
+              accountId: creatorAccount.id,
+              categoryId: creatorCategory.id,
+              amount: creatorShare,
+              description: `Settlement Share: ${group.name}`
+            }
+          });
+        }
+      }
+
       return res.status(200).json({
         message: 'Settlement paid. Group is now fully settled!',
         settlement: updatedSettlement,
