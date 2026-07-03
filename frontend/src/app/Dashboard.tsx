@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, ApiError } from '../api/client';
-import './app.css';
 import { BudgetsPanel } from './BudgetsPanel';
 import { ExpensesPanel } from './ExpensesPanel';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 interface Account {
   id: string;
@@ -249,210 +253,271 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="dashboard-container">
-      {globalError && <div className="error-alert">{globalError}</div>}
+    <div className="flex flex-col gap-6 p-6 w-full max-w-6xl mx-auto">
+      {globalError && (
+        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm">
+          {globalError}
+        </div>
+      )}
 
-      <div className="dashboard-grid">
-        {/* Left column: Accounts List & Create Account */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="panel accounts-panel">
-          <div className="panel-header">
-            <h2>Your Accounts</h2>
-            <button className="btn-icon" onClick={() => fetchAccounts(false)} title="Refresh accounts">
-              ↻
-            </button>
-          </div>
-
-          {loadingAccounts ? (
-            <div className="panel-loading">Loading accounts...</div>
-          ) : accounts.length === 0 ? (
-            <div className="panel-empty">No accounts found. Create one below to begin.</div>
-          ) : (
-            <div className="accounts-list">
-              {accounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className={`account-card ${selectedAccountId === acc.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedAccountId(acc.id);
-                    setFromAccountId(acc.id);
-                  }}
-                >
-                  <div className="account-card-header">
-                    <span className="account-name">{acc.name}</span>
-                    <span className="account-balance">₹{parseFloat(acc.balance).toFixed(2)}</span>
-                  </div>
-                  <div className="account-id">{acc.id}</div>
-                </div>
-              ))}
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+        {/* Left column: Accounts List & Create Account & Budgets */}
+        <div className="flex flex-col gap-6 w-full">
+          <Card className="p-6 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h2 className="text-lg font-semibold text-text-primary tracking-tight">Your Accounts</h2>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => fetchAccounts(false)} 
+                title="Refresh accounts"
+                className="h-11 w-11 text-text-secondary hover:text-text-primary"
+              >
+                ↻
+              </Button>
             </div>
-          )}
 
-          <div className="panel-divider"></div>
+            <div className="min-h-[140px] flex flex-col justify-center">
+              {loadingAccounts ? (
+                <div className="py-8 text-center text-text-secondary text-sm">Loading accounts...</div>
+              ) : accounts.length === 0 ? (
+                <div className="py-8 text-center text-text-secondary text-sm">No accounts found. Create one below to begin.</div>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 py-1">
+                  {accounts.map((acc) => (
+                    <Card
+                      key={acc.id}
+                      onClick={() => {
+                        setSelectedAccountId(acc.id);
+                        setFromAccountId(acc.id);
+                      }}
+                      className={`p-4 cursor-pointer transition-colors ${
+                        selectedAccountId === acc.id
+                          ? 'border-accent bg-surface-elevated'
+                          : 'bg-background hover:border-text-secondary/40'
+                      }`}
+                    >
+                      <div className="flex justify-between items-baseline gap-2">
+                        <span className="font-semibold text-text-primary text-sm truncate">{acc.name}</span>
+                        <span className="font-mono text-text-primary text-sm shrink-0">₹{parseFloat(acc.balance).toFixed(2)}</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-text-secondary truncate mt-1">{acc.id}</div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Create Account Form */}
-          <div className="create-account-section">
-            <h3>Create New Account</h3>
-            <form onSubmit={handleCreateAccount} className="dashboard-form">
-              {createAccountError && <div className="error-message">{createAccountError}</div>}
+            <div className="border-t border-border pt-4 mt-2">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Create New Account</h3>
+              <form onSubmit={handleCreateAccount} className="flex flex-col gap-3">
+                {createAccountError && (
+                  <div className="p-2 text-xs rounded bg-danger/10 border border-danger text-danger">
+                    {createAccountError}
+                  </div>
+                )}
 
-              <div className="form-group-dashboard">
-                <input
-                  type="text"
-                  placeholder="Account Name (e.g. Checking)"
-                  value={newAccountName}
-                  onChange={(e) => setNewAccountName(e.target.value)}
-                  disabled={isCreatingAccount}
-                />
-              </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="create-account-name">Account Name</Label>
+                  <Input
+                    id="create-account-name"
+                    type="text"
+                    placeholder="e.g. Checking"
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    disabled={isCreatingAccount}
+                  />
+                </div>
 
-              <div className="form-group-dashboard">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Starting Balance (optional, defaults to ₹0.00)"
-                  value={newAccountBalance}
-                  onChange={(e) => setNewAccountBalance(e.target.value)}
-                  disabled={isCreatingAccount}
-                />
-              </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="create-starting-balance">Starting Balance (Optional)</Label>
+                  <Input
+                    id="create-starting-balance"
+                    type="number"
+                    step="0.01"
+                    placeholder="₹0.00"
+                    value={newAccountBalance}
+                    onChange={(e) => setNewAccountBalance(e.target.value)}
+                    disabled={isCreatingAccount}
+                    className="font-mono"
+                  />
+                </div>
 
-              <button type="submit" className="btn-secondary w-full" disabled={isCreatingAccount}>
-                {isCreatingAccount ? 'Creating...' : 'Create Account'}
-              </button>
-            </form>
-          </div>
-          </div>
+                <Button type="submit" disabled={isCreatingAccount} className="w-full mt-1">
+                  {isCreatingAccount ? 'Creating...' : 'Create Account'}
+                </Button>
+              </form>
+            </div>
+          </Card>
+
+          {/* Budgets Panel */}
           <BudgetsPanel budgets={budgets} loading={loadingExtra} onRefresh={fetchExtraData} />
         </div>
 
-        {/* Right column: Transfer Form & Transaction History */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="panel transfer-history-panel">
-
-          {/* Transfer Funds Form */}
-          <div className="transfer-section">
-            <h2>Transfer Funds</h2>
-            <form onSubmit={handleTransfer} className="dashboard-form">
-              {transferError && <div className="error-message">{transferError}</div>}
-              {transferSuccess && <div className="success-message">{transferSuccess}</div>}
-
-              <div className="form-grid-dashboard">
-                <div className="form-group-dashboard">
-                  <label>Source Account</label>
-                  <select
-                    value={fromAccountId}
-                    onChange={(e) => setFromAccountId(e.target.value)}
-                    disabled={isTransferring}
-                  >
-                    <option value="" disabled>Select source account...</option>
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} (₹{parseFloat(acc.balance).toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group-dashboard">
-                  <label>Recipient Account UUID</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-                    value={toAccountId}
-                    onChange={(e) => setToAccountId(e.target.value)}
-                    disabled={isTransferring}
-                  />
-                </div>
+        {/* Right column: Transfer Form & Transaction History & Expenses */}
+        <div className="flex flex-col gap-6 w-full">
+          <Card className="p-6 flex flex-col gap-6">
+            
+            {/* Transfer Funds Form */}
+            <div>
+              <div className="border-b border-border pb-3 mb-4">
+                <h2 className="text-lg font-semibold text-text-primary tracking-tight">Transfer Funds</h2>
               </div>
+              
+              <form onSubmit={handleTransfer} className="flex flex-col gap-4">
+                {transferError && (
+                  <div className="p-3 text-sm rounded bg-danger/10 border border-danger text-danger">
+                    {transferError}
+                  </div>
+                )}
+                {transferSuccess && (
+                  <div className="p-3 text-sm rounded bg-success/10 border border-success text-success">
+                    {transferSuccess}
+                  </div>
+                )}
 
-              <div className="form-grid-dashboard">
-                <div className="form-group-dashboard">
-                  <label>Amount (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
-                    disabled={isTransferring}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="transfer-source-select">Source Account</Label>
+                    <Select
+                      value={fromAccountId}
+                      onValueChange={setFromAccountId}
+                      disabled={isTransferring}
+                    >
+                      <SelectTrigger id="transfer-source-select">
+                        <SelectValue placeholder="Select source account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} (₹{parseFloat(acc.balance).toFixed(2)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="transfer-recipient-id">Recipient Account UUID</Label>
+                    <Input
+                      id="transfer-recipient-id"
+                      type="text"
+                      placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+                      value={toAccountId}
+                      onChange={(e) => setToAccountId(e.target.value)}
+                      disabled={isTransferring}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group-dashboard">
-                  <label>Idempotency Key (Auto-Generated)</label>
-                  <input
-                    type="text"
-                    value={idempotencyKey}
-                    readOnly
-                    className="monospace-input"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="transfer-amount-input">Amount (₹)</Label>
+                    <Input
+                      id="transfer-amount-input"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={transferAmount}
+                      onChange={(e) => setTransferAmount(e.target.value)}
+                      disabled={isTransferring}
+                      className="font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="transfer-idempotency-key">Idempotency Key (Auto-Generated)</Label>
+                    <Input
+                      id="transfer-idempotency-key"
+                      value={idempotencyKey}
+                      readOnly
+                      className="font-mono text-text-secondary bg-surface"
+                    />
+                  </div>
                 </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={isTransferring || accounts.length === 0}
+                  className="w-full sm:w-auto self-start mt-2"
+                >
+                  {isTransferring ? 'Processing secure transfer...' : 'Initiate Transfer'}
+                </Button>
+              </form>
+            </div>
+
+            {/* Selected Account's Transaction History */}
+            <div className="border-t border-border pt-6">
+              <div className="pb-3 mb-4">
+                <h2 className="text-lg font-semibold text-text-primary tracking-tight">Transaction History</h2>
               </div>
+              
+              {selectedAccountId ? (
+                loadingHistory ? (
+                  <div className="py-8 text-center text-text-secondary text-sm">Loading transactions...</div>
+                ) : transactions.length === 0 ? (
+                  <div className="py-8 text-center text-text-secondary text-sm">No transaction history found for this account.</div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {transactions.map((tx) => {
+                      const isSender = tx.fromAccountId === selectedAccountId;
+                      const amountText = (isSender ? '-' : '+') + `₹${parseFloat(tx.amount).toFixed(2)}`;
+                      const statusClass = tx.status === 'COMPLETED' ? 'border-success/30' : 'border-danger/30';
+                      const statusBadgeClass = tx.status === 'COMPLETED' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger';
 
-              <button type="submit" className="btn-accent" disabled={isTransferring || accounts.length === 0}>
-                {isTransferring ? 'Processing secure transfer...' : 'Initiate Transfer'}
-              </button>
-            </form>
-          </div>
-
-          <div className="panel-divider"></div>
-
-          {/* Selected Account's Transaction History */}
-          <div className="history-section">
-            <h2>Transaction History</h2>
-            {selectedAccountId ? (
-              loadingHistory ? (
-                <div className="panel-loading">Loading transactions...</div>
-              ) : transactions.length === 0 ? (
-                <div className="panel-empty">No transaction history found for this account.</div>
+                      return (
+                        <Card 
+                          key={tx.id} 
+                          className={`p-4 bg-background border ${statusClass} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3`}
+                        >
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${statusBadgeClass}`}>
+                                {tx.status}
+                              </span>
+                              <span className="text-[10px] text-text-secondary font-mono truncate">
+                                {tx.id}
+                              </span>
+                            </div>
+                            <span className="text-xs text-text-secondary font-mono truncate mt-1">
+                              {isSender
+                                ? `To: ${tx.toAccountId}`
+                                : `From: ${tx.fromAccountId}`
+                              }
+                            </span>
+                          </div>
+                          
+                          <div className="text-left sm:text-right flex flex-col sm:items-end gap-1 flex-shrink-0">
+                            <span className={`font-mono text-sm font-semibold ${isSender ? 'text-text-primary' : 'text-success'}`}>
+                              {amountText}
+                            </span>
+                            <span className="text-[10px] text-text-secondary">
+                              {new Date(tx.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
-                <div className="history-list">
-                  {transactions.map((tx) => {
-                    const isSender = tx.fromAccountId === selectedAccountId;
-                    const amountText = (isSender ? '-' : '+') + `₹${parseFloat(tx.amount).toFixed(2)}`;
+                <div className="py-8 text-center text-text-secondary text-sm">Select or create an account to view transaction history.</div>
+              )}
+            </div>
+          </Card>
 
-                    return (
-                      <div key={tx.id} className={`history-item ${tx.status.toLowerCase()}`}>
-                        <div className="history-item-left">
-                          <span className={`status-badge ${tx.status.toLowerCase()}`}>
-                            {tx.status}
-                          </span>
-                          <span className="tx-details">
-                            {isSender
-                              ? `To: ${tx.toAccountId}`
-                              : `From: ${tx.fromAccountId}`
-                            }
-                          </span>
-                        </div>
-                        <div className="history-item-right">
-                          <span className={`tx-amount ${isSender ? 'sent' : 'received'} ${tx.status.toLowerCase()}`}>
-                            {amountText}
-                          </span>
-                          <span className="tx-date">
-                            {new Date(tx.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            ) : (
-              <div className="panel-empty">Select or create an account to view transaction history.</div>
-            )}
-          </div>
+          {/* Expenses Panel */}
+          <ExpensesPanel 
+            accounts={accounts} 
+            categories={categories} 
+            expenses={expenses} 
+            loading={loadingExtra} 
+            onRefresh={handleRefreshAll} 
+          />
         </div>
-        <ExpensesPanel 
-          accounts={accounts} 
-          categories={categories} 
-          expenses={expenses} 
-          loading={loadingExtra} 
-          onRefresh={handleRefreshAll} 
-        />
-      </div>
       </div>
     </div>
   );
 };
+
 export default Dashboard;

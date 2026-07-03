@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import './settings.css';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 
 interface Category {
   id: string;
@@ -19,14 +23,19 @@ export const SettingsPage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Form & action feedback states
+  // Category Manager dialog state
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [categorySuccess, setCategorySuccess] = useState<string | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
+  // Budget limit dialog state
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [limits, setLimits] = useState<Record<string, string>>({});
-  const [budgetFeedback, setBudgetFeedback] = useState<Record<string, { success?: string; error?: string; saving?: boolean }>>({});
+  const [editLimitValue, setEditLimitValue] = useState('');
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -73,6 +82,7 @@ export const SettingsPage: React.FC = () => {
       });
       setNewCategoryName('');
       setCategorySuccess('Category created successfully!');
+      setIsAddCategoryOpen(false); // Close modal
       await fetchData();
     } catch (err: any) {
       setCategoryError(err.message || 'Failed to create category.');
@@ -82,6 +92,9 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this category?')) {
+      return;
+    }
     setCategoryError(null);
     setCategorySuccess(null);
 
@@ -96,56 +109,49 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleLimitChange = (categoryId: string, val: string) => {
-    setLimits(prev => ({ ...prev, [categoryId]: val }));
-    // Clear feedback when typing
-    setBudgetFeedback(prev => ({ ...prev, [categoryId]: {} }));
+  const openBudgetDialog = (category: Category) => {
+    setEditingCategory(category);
+    setEditLimitValue(limits[category.id] || '');
+    setBudgetError(null);
   };
 
-  const handleSaveBudget = async (categoryId: string) => {
-    const rawLimit = limits[categoryId];
-    
-    setBudgetFeedback(prev => ({
-      ...prev,
-      [categoryId]: { saving: true }
-    }));
+  const handleSaveBudget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    setBudgetError(null);
+    setIsSavingBudget(true);
 
-    // If limit is empty or 0, clear/delete the budget limit row
-    if (rawLimit === '' || rawLimit === undefined || parseFloat(rawLimit) === 0) {
+    const categoryId = editingCategory.id;
+
+    // If limit is empty, 0, or cleared, clear/delete the budget limit row
+    if (editLimitValue === '' || parseFloat(editLimitValue) === 0) {
       try {
         await apiClient(`/budgets/${categoryId}`, {
           method: 'DELETE'
         });
 
-        setBudgetFeedback(prev => ({
-          ...prev,
-          [categoryId]: { success: 'Limit cleared!' }
-        }));
+        // Update local limits and close dialog
         setLimits(prev => ({ ...prev, [categoryId]: '' }));
+        setEditingCategory(null);
+        await fetchData();
       } catch (err: any) {
-        // If not found, it means no limit was set yet, which is fine
         if (err.status === 404) {
-          setBudgetFeedback(prev => ({
-            ...prev,
-            [categoryId]: { success: 'No limit set.' }
-          }));
+          // If not found, it means no limit was set yet, which is fine
           setLimits(prev => ({ ...prev, [categoryId]: '' }));
+          setEditingCategory(null);
         } else {
-          setBudgetFeedback(prev => ({
-            ...prev,
-            [categoryId]: { error: err.message || 'Failed to clear.' }
-          }));
+          setBudgetError(err.message || 'Failed to clear budget limit.');
         }
+      } finally {
+        setIsSavingBudget(false);
       }
       return;
     }
 
-    const numericLimit = parseFloat(rawLimit);
+    const numericLimit = parseFloat(editLimitValue);
     if (isNaN(numericLimit) || numericLimit <= 0) {
-      setBudgetFeedback(prev => ({
-        ...prev,
-        [categoryId]: { error: 'Must be greater than 0.' }
-      }));
+      setBudgetError('Monthly limit must be greater than zero.');
+      setIsSavingBudget(false);
       return;
     }
 
@@ -158,131 +164,219 @@ export const SettingsPage: React.FC = () => {
         }
       });
 
-      setBudgetFeedback(prev => ({
-        ...prev,
-        [categoryId]: { success: 'Saved!' }
-      }));
-
-      // Refresh budget list to reflect changes
-      const budgetsData = await apiClient<Budget[]>('/budgets');
-      
-      // Update limits state with the newly saved budget limit
-      const b = budgetsData.find(x => x.categoryId === categoryId);
-      if (b) {
-        setLimits(prev => ({ ...prev, [categoryId]: parseFloat(b.monthlyLimit).toString() }));
-      }
+      // Update limits and close dialog
+      setLimits(prev => ({ ...prev, [categoryId]: numericLimit.toString() }));
+      setEditingCategory(null);
+      await fetchData();
     } catch (err: any) {
-      setBudgetFeedback(prev => ({
-        ...prev,
-        [categoryId]: { error: err.message || 'Failed to save.' }
-      }));
+      setBudgetError(err.message || 'Failed to save budget limit.');
+    } finally {
+      setIsSavingBudget(false);
     }
   };
 
   return (
-    <div className="settings-container animate-fade-in">
-      <div className="settings-grid">
-        {/* Left Panel: Category Management */}
-        <div className="panel">
-          <div className="settings-section-header">
-            <h2>Manage Categories</h2>
+    <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border pb-4 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">Settings</h1>
+          <p className="text-sm text-text-secondary">Configure spending categories and standing monthly budget limits.</p>
+        </div>
+      </div>
+
+      {categoryError && (
+        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm">
+          {categoryError}
+        </div>
+      )}
+
+      {categorySuccess && (
+        <div className="p-4 rounded bg-success/10 border border-success text-success text-sm">
+          {categorySuccess}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        
+        {/* 1. Category Management Card */}
+        <Card className="p-6">
+          <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+            <h2 className="text-lg font-semibold text-text-primary tracking-tight">Categories</h2>
+            
+            {/* Add Category Dialog */}
+            <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="h-11 px-4 text-sm font-semibold">
+                  + Add Category
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleCreateCategory}>
+                  <DialogHeader className="mb-4">
+                    <DialogTitle>Add Category</DialogTitle>
+                    <DialogDescription>Create a custom spending category. Names must be unique.</DialogDescription>
+                  </DialogHeader>
+
+                  <div className="flex flex-col gap-1.5 mb-6">
+                    <Label htmlFor="category-name">Category Name</Label>
+                    <Input
+                      id="category-name"
+                      placeholder="e.g. Groceries, Transport"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      disabled={isCreatingCategory}
+                    />
+                  </div>
+
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsAddCategoryOpen(false)}
+                      disabled={isCreatingCategory}
+                      className="max-sm:w-full"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={isCreatingCategory}
+                      className="max-sm:w-full"
+                    >
+                      {isCreatingCategory ? 'Creating...' : 'Create'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
 
-          {categoryError && <div className="error-alert">{categoryError}</div>}
-          {categorySuccess && <div className="success-message" style={{ marginBottom: '14px' }}>{categorySuccess}</div>}
-
           {loading ? (
-            <div className="panel-loading">Loading categories...</div>
+            <div className="py-8 text-center text-text-secondary text-sm">Loading categories...</div>
           ) : categories.length === 0 ? (
-            <div className="panel-empty">No categories found. Create one below to begin.</div>
+            <div className="py-8 text-center text-text-secondary text-sm">No custom categories created yet.</div>
           ) : (
-            <div className="category-manager-list">
+            <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
               {categories.map(cat => (
-                <div key={cat.id} className="category-manager-item">
-                  <span className="category-name-tag">{cat.name}</span>
-                  <button 
-                    className="btn-danger-outline" 
+                <div 
+                  key={cat.id} 
+                  className="flex justify-between items-center p-3 rounded border border-border bg-background"
+                >
+                  <span className="font-semibold text-text-primary text-sm">{cat.name}</span>
+                  <Button 
+                    variant="outline" 
                     onClick={() => handleDeleteCategory(cat.id)}
-                    title="Delete Category"
+                    className="text-danger border-danger/20 hover:bg-danger/10 hover:border-danger text-xs h-9 min-h-0 min-w-0"
                   >
-                    ✕ Delete
-                  </button>
+                    Delete
+                  </Button>
                 </div>
               ))}
             </div>
           )}
+        </Card>
 
-          <div className="panel-divider"></div>
-
-          <div className="create-account-section">
-            <h3>Add New Category</h3>
-            <form onSubmit={handleCreateCategory} className="dashboard-form">
-              <div className="form-group-dashboard">
-                <input
-                  type="text"
-                  placeholder="Category Name (e.g. Groceries, Entertainment)"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  disabled={isCreatingCategory}
-                />
-              </div>
-              <button type="submit" className="btn-accent w-full" disabled={isCreatingCategory}>
-                {isCreatingCategory ? 'Adding...' : 'Add Category'}
-              </button>
-            </form>
+        {/* 2. Budget limits Card */}
+        <Card className="p-6">
+          <div className="border-b border-border pb-3 mb-4">
+            <h2 className="text-lg font-semibold text-text-primary tracking-tight">Monthly Budget Limits</h2>
           </div>
-        </div>
-
-        {/* Right Panel: Budget Limits */}
-        <div className="panel">
-          <div className="settings-section-header">
-            <h2>Budget Limits</h2>
-          </div>
-
-          <p style={{ fontSize: '13px', marginBottom: '16px', color: 'var(--text)' }}>
-            Set a standing monthly spending limit per category. These limits automatically apply every month.
-          </p>
 
           {loading ? (
-            <div className="panel-loading">Loading budget editor...</div>
+            <div className="py-8 text-center text-text-secondary text-sm">Loading limits...</div>
           ) : categories.length === 0 ? (
-            <div className="panel-empty">Please create a category first before setting a budget.</div>
+            <div className="py-8 text-center text-text-secondary text-sm">Create a category first to set budget limits.</div>
           ) : (
-            <div className="budget-limits-list">
+            <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
               {categories.map(cat => {
-                const feedback = budgetFeedback[cat.id] || {};
+                const limitAmount = limits[cat.id];
                 return (
-                  <div key={cat.id} className="budget-limit-row">
-                    <label title={cat.name}>{cat.name}</label>
-                    <div className="budget-limit-input-wrapper">
-                      <span className="budget-currency-symbol">₹</span>
-                      <input
-                        type="number"
-                        step="1"
-                        placeholder="Limit amount"
-                        value={limits[cat.id] || ''}
-                        onChange={(e) => handleLimitChange(cat.id, e.target.value)}
-                        disabled={feedback.saving}
-                      />
+                  <div 
+                    key={cat.id} 
+                    className="flex justify-between items-center p-3 rounded border border-border bg-background gap-4"
+                  >
+                    <div className="min-w-0 flex-grow">
+                      <span className="font-semibold text-text-primary text-sm block truncate">{cat.name}</span>
+                      <span className="text-xs text-text-secondary font-mono">
+                        {limitAmount ? `₹${parseFloat(limitAmount).toFixed(2)} / month` : 'No limit set'}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                      <button
-                        className="btn-accent"
-                        onClick={() => handleSaveBudget(cat.id)}
-                        disabled={feedback.saving}
-                      >
-                        {feedback.saving ? 'Saving...' : 'Save'}
-                      </button>
-                      {feedback.success && <span style={{ fontSize: '11px', color: '#10b981' }}>{feedback.success}</span>}
-                      {feedback.error && <span style={{ fontSize: '11px', color: 'var(--error)' }}>{feedback.error}</span>}
-                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => openBudgetDialog(cat)}
+                      className="text-xs h-9 min-h-0 px-3 shrink-0"
+                    >
+                      {limitAmount ? 'Edit Limit' : 'Set Limit'}
+                    </Button>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </Card>
       </div>
+
+      {/* Edit Budget Limit Modal Dialog */}
+      <Dialog open={editingCategory !== null} onOpenChange={(open) => { if (!open) setEditingCategory(null); }}>
+        <DialogContent>
+          {editingCategory && (
+            <form onSubmit={handleSaveBudget}>
+              <DialogHeader className="mb-4">
+                <DialogTitle>Budget Limit: {editingCategory.name}</DialogTitle>
+                <DialogDescription>
+                  Configure the standing monthly spending limit for this category. Leave blank or enter 0 to disable.
+                </DialogDescription>
+              </DialogHeader>
+
+              {budgetError && (
+                <div className="p-3 text-xs rounded bg-danger/10 border border-danger text-danger mb-4">
+                  {budgetError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1.5 mb-6">
+                <Label htmlFor="budget-limit">Monthly Limit (₹)</Label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 text-text-secondary font-mono text-sm">₹</span>
+                  <Input
+                    id="budget-limit"
+                    type="number"
+                    step="1"
+                    placeholder="e.g. 5000"
+                    value={editLimitValue}
+                    onChange={(e) => setEditLimitValue(e.target.value)}
+                    disabled={isSavingBudget}
+                    className="pl-7 font-mono"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setEditingCategory(null)}
+                  disabled={isSavingBudget}
+                  className="max-sm:w-full"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSavingBudget}
+                  className="max-sm:w-full"
+                >
+                  {isSavingBudget ? 'Saving...' : 'Save Limit'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };

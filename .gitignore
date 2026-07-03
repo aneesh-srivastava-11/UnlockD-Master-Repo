@@ -33,3 +33,10 @@ yarn-error.log*
 *.sln
 *.sw?
 Thumbs.db
+
+# Local testing resources
+frontend/src/tests/
+frontend/e2e/
+frontend/playwright.config.ts
+playwright-report/
+test-results/

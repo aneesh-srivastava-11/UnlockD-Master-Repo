@@ -1,4 +1,7 @@
 import React from 'react';
+import { Card } from '../components/ui/card';
+import { Progress } from '../components/ui/progress';
+import { Button } from '../components/ui/button';
 
 export interface BudgetUtilization {
   id: string;
@@ -18,107 +21,86 @@ interface BudgetsPanelProps {
 
 export const BudgetsPanel: React.FC<BudgetsPanelProps> = ({ budgets, loading, onRefresh }) => {
   return (
-    <div className="panel budgets-panel">
-      <div className="panel-header">
-        <h2>Smart Budgets (Current Month)</h2>
-        <button className="btn-icon" onClick={onRefresh} title="Refresh budgets">
+    <Card className="p-6">
+      <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+        <h2 className="text-lg font-semibold text-text-primary tracking-tight">Smart Budgets (Current Month)</h2>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onRefresh} 
+          title="Refresh budgets"
+          className="h-11 w-11 text-text-secondary hover:text-text-primary"
+        >
           ↻
-        </button>
+        </Button>
       </div>
 
       {loading ? (
-        <div className="panel-loading">Loading budgets...</div>
+        <div className="py-8 text-center text-text-secondary text-sm">Loading budgets...</div>
       ) : budgets.length === 0 ? (
-        <div className="panel-empty">
+        <div className="py-8 text-center text-text-secondary text-sm">
           No budgets configured for this month. 
           Go to Settings to set monthly limits for your categories.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex flex-col gap-4">
           {budgets.map((b) => {
             const spentNum = parseFloat(b.spent);
             const limitNum = parseFloat(b.monthlyLimit);
             const remainingNum = parseFloat(b.remaining);
             const percent = b.percentUsed;
 
-            // Determine bar color
-            let barColor = '#71717a'; // zinc-500 (neutral under 80%)
+            // Determine bar color and text color class based on budget usage
+            let indicatorClass = 'bg-success'; // success (< 80%)
+            let textClass = 'text-success';
             if (percent >= 100) {
-              barColor = 'var(--error)'; // red-500 (100%+)
+              indicatorClass = 'bg-danger'; // danger (100%+)
+              textClass = 'text-danger';
             } else if (percent >= 80) {
-              barColor = '#f59e0b'; // amber-500 (80-99%)
+              indicatorClass = 'bg-warning'; // warning (80-99%)
+              textClass = 'text-warning';
             }
 
-            // Cap the progress display width to 100%
-            const displayPercent = Math.min(percent, 100);
-
             return (
-              <div 
-                key={b.id} 
-                className="budget-card-item"
-                style={{
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-h)', fontSize: '14.5px' }}>
+              <Card key={b.id} className="p-4 bg-background border-border flex flex-col gap-3">
+                <div className="flex justify-between items-baseline">
+                  <span className="font-semibold text-text-primary text-sm">
                     {b.categoryName}
                   </span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--text)' }}>
+                  <span className="font-mono text-xs text-text-secondary">
                     ₹{spentNum.toFixed(2)} / ₹{limitNum.toFixed(2)}
                   </span>
                 </div>
 
-                {/* Progress Bar Track */}
-                <div 
-                  style={{
-                    height: '8px',
-                    borderRadius: '4px',
-                    background: 'rgba(39, 39, 42, 0.5)',
-                    border: '1px solid var(--border)',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <div 
-                    style={{
-                      height: '100%',
-                      width: `${displayPercent}%`,
-                      background: barColor,
-                      borderRadius: '4px',
-                      transition: 'width 0.4s ease-out, background-color 0.2s'
-                    }}
-                  />
-                </div>
+                <Progress 
+                  value={percent} 
+                  indicatorClassName={indicatorClass}
+                  className="h-2.5 border border-border"
+                  aria-label={`${b.categoryName} budget utilization`}
+                />
 
-                {/* Progress Details */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <span style={{ color: percent >= 100 ? 'var(--error)' : percent >= 80 ? '#f59e0b' : 'var(--text)' }}>
+                <div className="flex justify-between text-xs">
+                  <span className={`${textClass} font-medium`}>
                     {percent.toFixed(0)}% used
                   </span>
                   <span>
                     {remainingNum >= 0 ? (
-                      <span style={{ color: 'var(--text)' }}>
+                      <span className="text-text-secondary">
                         ₹{remainingNum.toFixed(2)} remaining
                       </span>
                     ) : (
-                      <span style={{ color: 'var(--error)' }}>
+                      <span className="text-danger font-medium">
                         Overdraft by ₹{Math.abs(remainingNum).toFixed(2)}
                       </span>
                     )}
                   </span>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

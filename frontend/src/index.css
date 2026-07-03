@@ -1,12 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  /* Colors - Modern Dark Theme First */
-  --bg: #09090b;          /* near-black base (not pure #000) */
-  --surface: #18181b;     /* card / panel surface */
-  --border: #27272a;      /* thin 1px borders separator */
-  --text: #a1a1aa;        /* zinc-400 for general description texts */
-  --text-h: #fafafa;      /* zinc-50 for high contrast headers */
-  --accent: #e11d48;      /* rose-600 (one accent used sparingly for action buttons / focus ring) */
-  --error: #ef4444;       /* red-500 for error states */
+  /* Colors - Strict Theme System Overrides */
+  --background: #0A0A0B;
+  --surface: #141416;
+  --surface-elevated: #1C1C1F;
+  --border: #2A2A2E;
+  --text-primary: #F2F2F0;
+  --text-secondary: #9B9B9F;
+  --text-disabled: #5C5C60;
+  --accent: #4F7CFF;
+  --success: #3ECF8E;
+  --warning: #E8A33D;
+  --danger: #E5484D;
+
+  /* Backward compatibility variables for existing stylesheet dependencies */
+  --bg: var(--background);
+  --text: var(--text-secondary);
+  --text-h: var(--text-primary);
+  --error: var(--danger);
+
+  --radius: 0.25rem;
 
   /* Typography */
   --sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -14,8 +30,8 @@
 
   font: 16px/1.5 var(--sans);
   color-scheme: dark;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--text-primary);
+  background: var(--background);
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,8 +41,8 @@
 
 body {
   margin: 0;
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: var(--background);
+  color: var(--text-primary);
 }
 
 #root {

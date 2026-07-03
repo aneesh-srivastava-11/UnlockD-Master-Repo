@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
+import { Card } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 export interface Account {
   id: string;
@@ -175,69 +180,79 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="flex flex-col gap-6">
       
       {/* 1. Record Expense Form */}
-      <div className="panel">
-        <div className="panel-header">
-          <h2>Record Expense</h2>
+      <Card className="p-6">
+        <div className="border-b border-border pb-3 mb-4">
+          <h2 className="text-lg font-semibold text-text-primary tracking-tight">Record Expense</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="dashboard-form">
-          {formError && <div className="error-message">{formError}</div>}
-          {formSuccess && <div className="success-message">{formSuccess}</div>}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {formError && <div className="p-3 text-sm rounded bg-danger/10 border border-danger text-danger">{formError}</div>}
+          {formSuccess && <div className="p-3 text-sm rounded bg-success/10 border border-success text-success">{formSuccess}</div>}
 
-          <div className="form-grid-dashboard">
-            <div className="form-group-dashboard">
-              <label>Account</label>
-              <select
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="expense-account">Account</Label>
+              <Select
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onValueChange={setSelectedAccountId}
                 disabled={isCreating}
               >
-                <option value="" disabled>Select account...</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} (₹{parseFloat(acc.balance).toFixed(2)})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="expense-account">
+                  <SelectValue placeholder="Select account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name} (₹{parseFloat(acc.balance).toFixed(2)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="form-group-dashboard">
-              <label>Category</label>
-              <select
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="expense-category">Category</Label>
+              <Select
                 value={selectedCategoryId}
-                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                onValueChange={setSelectedCategoryId}
                 disabled={isCreating}
               >
-                <option value="" disabled>Select category...</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="expense-category">
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="form-grid-dashboard">
-            <div className="form-group-dashboard">
-              <label>Amount (₹)</label>
-              <input
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="expense-amount">Amount (₹)</Label>
+              <Input
+                id="expense-amount"
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={isCreating}
-                className="monospace-input"
+                className="font-mono"
               />
             </div>
 
-            <div className="form-group-dashboard">
-              <label>Description (Optional)</label>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="expense-description">Description (Optional)</Label>
+              <Input
+                id="expense-description"
                 type="text"
                 placeholder="e.g. Weekly Groceries"
                 value={description}
@@ -247,157 +262,158 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
             </div>
           </div>
 
-          <button type="submit" className="btn-accent" disabled={isCreating || accounts.length === 0 || categories.length === 0}>
+          <Button 
+            type="submit" 
+            className="w-full sm:w-auto self-start mt-2" 
+            disabled={isCreating || accounts.length === 0 || categories.length === 0}
+          >
             {isCreating ? 'Recording expense...' : 'Record Expense'}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
       {/* 2. Expense List */}
-      <div className="panel">
-        <div className="panel-header">
-          <h2>Expenses Log (Current Month)</h2>
+      <Card className="p-6">
+        <div className="border-b border-border pb-3 mb-4">
+          <h2 className="text-lg font-semibold text-text-primary tracking-tight">Expenses Log (Current Month)</h2>
         </div>
 
         {loading ? (
-          <div className="panel-loading">Loading expenses...</div>
+          <div className="py-8 text-center text-text-secondary text-sm">Loading expenses...</div>
         ) : expenses.length === 0 ? (
-          <div className="panel-empty">No expenses logged for this month.</div>
+          <div className="py-8 text-center text-text-secondary text-sm">No expenses logged for this month.</div>
         ) : (
-          <div className="history-list">
+          <div className="flex flex-col gap-3">
             {expenses.map((expense) => {
               const isEditing = editingId === expense.id;
 
               return (
-                <div 
+                <Card 
                   key={expense.id} 
-                  className="history-item"
-                  style={{
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    gap: '10px',
-                    borderColor: 'var(--border)'
-                  }}
+                  className="p-4 bg-background border-border flex flex-col gap-3"
                 >
                   {isEditing ? (
                     // Inline Editing Sub-Form
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {editError && <div className="error-message" style={{ fontSize: '12px' }}>{editError}</div>}
+                    <div className="flex flex-col gap-3">
+                      {editError && <div className="p-2 text-xs rounded bg-danger/10 border border-danger text-danger">{editError}</div>}
                       
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="form-group-dashboard">
-                          <label style={{ fontSize: '11px' }}>Category</label>
-                          <select
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <Label className="text-xs">Category</Label>
+                          <Select
                             value={editCategoryId}
-                            onChange={(e) => setEditCategoryId(e.target.value)}
+                            onValueChange={setEditCategoryId}
                             disabled={isSaving}
-                            style={{ padding: '6px' }}
                           >
-                            <option value="" disabled>Select category...</option>
-                            {categories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select category..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
 
-                        <div className="form-group-dashboard">
-                          <label style={{ fontSize: '11px' }}>Amount (₹)</label>
-                          <input
+                        <div className="flex flex-col gap-1.5">
+                          <Label className="text-xs">Amount (₹)</Label>
+                          <Input
                             type="number"
                             step="0.01"
                             value={editAmount}
                             onChange={(e) => setEditAmount(e.target.value)}
                             disabled={isSaving}
-                            className="monospace-input"
-                            style={{ padding: '6px' }}
+                            className="font-mono h-10"
                           />
                         </div>
                       </div>
 
-                      <div className="form-group-dashboard">
-                        <label style={{ fontSize: '11px' }}>Description</label>
-                        <input
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs">Description</Label>
+                        <Input
                           type="text"
                           value={editDescription}
                           onChange={(e) => setEditDescription(e.target.value)}
                           disabled={isSaving}
-                          style={{ padding: '6px' }}
+                          className="h-10"
                         />
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button 
-                          className="btn-secondary" 
+                      <div className="flex gap-2 justify-end mt-1">
+                        <Button 
+                          variant="outline"
                           onClick={cancelEdit} 
                           disabled={isSaving}
-                          style={{ padding: '4px 10px', fontSize: '12px' }}
+                          className="h-10 min-h-0 text-xs px-3"
                         >
                           Cancel
-                        </button>
-                        <button 
-                          className="btn-accent" 
+                        </Button>
+                        <Button 
                           onClick={() => handleSaveEdit(expense.id)} 
                           disabled={isSaving}
-                          style={{ padding: '4px 12px', fontSize: '12px' }}
+                          className="h-10 min-h-0 text-xs px-4"
                         >
                           {isSaving ? 'Saving...' : 'Save'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
                     // Regular Display Row
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontWeight: 600, color: 'var(--text-h)', fontSize: '14px' }}>
+                      <div className="flex justify-between items-baseline gap-4">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="font-semibold text-text-primary text-sm truncate">
                             {expense.category?.name || 'Uncategorized'}
                           </span>
-                          <span style={{ fontSize: '12px', color: 'var(--text)' }}>
-                            {expense.description || <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No description</span>}
+                          <span className="text-xs text-text-secondary truncate">
+                            {expense.description || <span className="italic opacity-60">No description</span>}
                           </span>
                         </div>
-                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span className="tx-amount sent" style={{ color: 'var(--error)' }}>
+                        <div className="text-right flex flex-col gap-1 flex-shrink-0">
+                          <span className="font-mono text-sm font-semibold text-danger">
                             -₹{parseFloat(expense.amount).toFixed(2)}
                           </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text)' }}>
+                          <span className="text-[10px] text-text-secondary">
                             via {expense.account?.name}
                           </span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '8px', marginTop: '4px' }}>
-                        <span style={{ color: 'var(--text)' }}>
+                      <div className="flex justify-between items-center text-[10px] border-t border-border pt-2 mt-1">
+                        <span className="text-text-secondary">
                           {new Date(expense.createdAt).toLocaleString()}
                         </span>
                         
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
-                            className="btn-secondary" 
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
                             onClick={() => startEdit(expense)}
-                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                            className="h-9 min-h-0 text-[11px] px-2.5"
                           >
                             Edit
-                          </button>
-                          <button 
-                            className="btn-danger-outline" 
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
                             onClick={() => handleDelete(expense.id)}
-                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                            className="h-9 min-h-0 text-[11px] px-2.5"
                           >
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </>
                   )}
-                </div>
+                </Card>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
 
     </div>
   );
