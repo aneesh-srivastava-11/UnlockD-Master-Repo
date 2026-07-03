@@ -6,6 +6,8 @@ import { SignupPage } from './auth/SignupPage';
 import { TopBar } from './app/TopBar';
 import { Dashboard } from './app/Dashboard';
 import { SettingsPage } from './app/SettingsPage';
+import { GroupsPage } from './app/GroupsPage';
+import { GroupDetailsPage } from './app/GroupDetailsPage';
 import './App.css';
 
 function App() {
@@ -36,6 +38,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/groups"
+                element={
+                  <ProtectedRoute>
+                    <GroupsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/groups/:id"
+                element={
+                  <ProtectedRoute>
+                    <GroupDetailsPage />
                   </ProtectedRoute>
                 }
               />

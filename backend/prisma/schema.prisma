@@ -20,10 +20,16 @@ model User {
   passwordHash String
   createdAt    DateTime  @default(now())
 
-  accounts     Account[]
-  categories   Category[]
-  expenses     Expense[]
-  budgets      Budget[]
+  accounts         Account[]
+  categories       Category[]
+  expenses         Expense[]
+  budgets          Budget[]
+  createdGroups    Group[]        @relation("CreatedGroups")
+  groupMembers     GroupMember[]
+  paidExpenses     GroupExpense[] @relation("PaidExpenses")
+  expenseSplits    ExpenseSplit[]
+  settlementsFrom  Settlement[]   @relation("SettlementFrom")
+  settlementsTo    Settlement[]   @relation("SettlementTo")
 }
 
 model Account {
@@ -50,6 +56,7 @@ model Transaction {
 
   fromAccount     Account           @relation("FromAccount", fields: [fromAccountId], references: [id])
   toAccount       Account           @relation("ToAccount", fields: [toAccountId], references: [id])
+  settlement      Settlement?
 }
 
 model Category {
@@ -91,5 +98,78 @@ model Budget {
   category     Category @relation(fields: [categoryId], references: [id])
 
   @@unique([userId, categoryId])
+}
+
+enum SettlementStatus {
+  PENDING
+  COMPLETED
+}
+
+model Group {
+  id         String   @id @default(uuid())
+  name       String
+  createdBy  String
+  isSettled  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  settledAt  DateTime?
+
+  creator      User            @relation("CreatedGroups", fields: [createdBy], references: [id])
+  members      GroupMember[]
+  expenses     GroupExpense[]
+  settlements  Settlement[]
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  group    Group @relation(fields: [groupId], references: [id])
+  user     User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+model GroupExpense {
+  id           String   @id @default(uuid())
+  groupId      String
+  paidByUserId String
+  description  String
+  amount       Decimal  @db.Decimal(19, 4)
+  createdAt    DateTime @default(now())
+
+  group        Group          @relation(fields: [groupId], references: [id])
+  paidBy       User           @relation("PaidExpenses", fields: [paidByUserId], references: [id])
+  splits       ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id             String  @id @default(uuid())
+  groupExpenseId String
+  userId         String
+  shareAmount    Decimal @db.Decimal(19, 4)
+
+  groupExpense   GroupExpense @relation(fields: [groupExpenseId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([groupExpenseId, userId])
+}
+
+model Settlement {
+  id            String           @id @default(uuid())
+  groupId       String
+  fromUserId    String
+  toUserId      String
+  amount        Decimal          @db.Decimal(19, 4)
+  status        SettlementStatus @default(PENDING)
+  transactionId String?          @unique
+  createdAt     DateTime         @default(now())
+  settledAt     DateTime?
+
+  group        Group       @relation(fields: [groupId], references: [id])
+  fromUser     User        @relation("SettlementFrom", fields: [fromUserId], references: [id])
+  toUser       User        @relation("SettlementTo", fields: [toUserId], references: [id])
+  transaction  Transaction? @relation(fields: [transactionId], references: [id])
 }
 

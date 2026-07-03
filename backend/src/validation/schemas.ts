@@ -119,4 +119,89 @@ export const expenseQuerySchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be in YYYY-MM format").optional()
 });
 
+/**
+ * Validation schema for POST /groups
+ */
+export const createGroupSchema = z.object({
+  name: z.string({
+    required_error: "Group name is required",
+    invalid_type_error: "Group name must be a string"
+  }).trim().min(1, "Group name cannot be empty")
+});
+
+/**
+ * Validation schema for POST /groups/:id/members
+ */
+export const addMemberSchema = z.object({
+  email: z.string({
+    required_error: "Email is required"
+  }).email("Invalid email format").trim()
+});
+
+/**
+ * Validation schema for POST /groups/:id/expenses
+ */
+export const createGroupExpenseSchema = z.object({
+  description: z.string({
+    required_error: "Description is required",
+    invalid_type_error: "Description must be a string"
+  }).trim().min(1, "Description cannot be empty"),
+  amount: z.number({
+    required_error: "Amount is required",
+    invalid_type_error: "Amount must be a number"
+  }).positive("Amount must be greater than zero"),
+  paidByUserId: z.string({
+    required_error: "paidByUserId is required"
+  }).uuid("paidByUserId must be a valid UUID"),
+  splitType: z.enum(["equal", "custom"], {
+    required_error: "splitType must be 'equal' or 'custom'"
+  }),
+  splits: z.array(
+    z.object({
+      userId: z.string().uuid("userId must be a valid UUID"),
+      shareAmount: z.number().positive("shareAmount must be positive").optional()
+    })
+  ).optional().default([])
+}).superRefine((data, ctx) => {
+  if (data.splitType === 'custom') {
+    if (!data.splits || data.splits.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one split member must be defined for custom splits",
+        path: ["splits"]
+      });
+      return;
+    }
+    let sum = 0;
+    for (const split of data.splits) {
+      if (split.shareAmount === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "shareAmount is required for custom splits",
+          path: ["splits"]
+        });
+        return;
+      }
+      sum += split.shareAmount;
+    }
+    // Compare with decimal tolerance (within 1 cent)
+    if (Math.abs(sum - data.amount) > 0.011) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Sum of custom splits (${sum.toFixed(2)}) must exactly equal the total expense amount (${data.amount.toFixed(2)})`,
+        path: ["splits"]
+      });
+    }
+  }
+});
+
+/**
+ * Validation schema for POST /settlements/:id/pay
+ */
+export const paySettlementSchema = z.object({
+  accountId: z.string({
+    required_error: "Account ID is required"
+  }).uuid("Account ID must be a valid UUID")
+});
+
 
