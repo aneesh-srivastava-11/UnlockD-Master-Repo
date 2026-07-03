@@ -2,10 +2,15 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .app-main {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }

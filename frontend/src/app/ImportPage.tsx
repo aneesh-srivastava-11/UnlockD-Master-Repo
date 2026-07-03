@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, FileUp, RefreshCcw, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { Button } from '../components/ui/button';
@@ -388,7 +389,11 @@ export const ImportPage: React.FC = () => {
                     </div>
                     {result && (
                       <span className={`text-xs ${result.success ? 'text-success' : 'text-danger'}`}>
-                        {result.success ? 'Applied' : result.error}
+                        {result.success ? (
+                          <Link to={`/history?q=${encodeURIComponent(item.merchant || item.rawDescription)}`} className="text-success underline-offset-4 hover:underline">
+                            Applied - view in History
+                          </Link>
+                        ) : result.error}
                       </span>
                     )}
                   </div>

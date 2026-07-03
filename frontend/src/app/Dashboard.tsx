@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { apiClient, ApiError } from '../api/client';
 import { BudgetsPanel } from './BudgetsPanel';
 import { ExpensesPanel } from './ExpensesPanel';
@@ -7,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { MetricCard, PageHeader, PageShell, StateBlock, StatusBadge } from './shared';
 
 interface Account {
   id: string;
@@ -25,6 +27,27 @@ interface Transaction {
   createdAt: string;
 }
 
+interface UnifiedRecord {
+  id: string;
+  type: 'TRANSFER' | 'EXPENSE';
+  date: string;
+  description: string | null;
+  amount: number;
+  accountName: string;
+  status: string;
+  direction: 'IN' | 'OUT';
+}
+
+interface GroupSummary {
+  id: string;
+  name: string;
+  isSettled: boolean;
+}
+
+interface ImportSummary {
+  id: string;
+}
+
 export const Dashboard: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
@@ -35,11 +58,15 @@ export const Dashboard: React.FC = () => {
   const [budgets, setBudgets] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExtra, setLoadingExtra] = useState(false);
+  const [recentRecords, setRecentRecords] = useState<UnifiedRecord[]>([]);
+  const [activeGroups, setActiveGroups] = useState<GroupSummary[]>([]);
+  const [pendingImports, setPendingImports] = useState<ImportSummary[]>([]);
 
   // Loading & Error States
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   // Form state: Create Account
   const [newAccountName, setNewAccountName] = useState('');
@@ -63,6 +90,23 @@ export const Dashboard: React.FC = () => {
     }
     return 'key-' + Math.random().toString(36).substring(2, 15) + '-' + Date.now().toString(36);
   };
+
+  const totalBalance = accounts.reduce((sum, account) => sum + parseFloat(account.balance || '0'), 0);
+
+  const budgetRisk = budgets
+    .map((budget: any) => {
+      const spent = parseFloat(budget.spent || budget.currentSpend || budget.used || '0');
+      const limit = parseFloat(budget.monthlyLimit || '0');
+      return {
+        ...budget,
+        spent,
+        limit,
+        utilization: limit > 0 ? spent / limit : 0
+      };
+    })
+    .filter((budget: any) => budget.limit > 0)
+    .sort((a: any, b: any) => b.utilization - a.utilization)
+    .slice(0, 3);
 
   // Fetch all user accounts
   const fetchAccounts = async (autoSelect = false) => {
@@ -118,18 +162,36 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const fetchOverviewData = async () => {
+    setOverviewError(null);
+    try {
+      const [recordsData, groupsData, importsData] = await Promise.all([
+        apiClient<{ records: UnifiedRecord[] }>('/records?page=1&pageSize=5'),
+        apiClient<GroupSummary[]>('/groups'),
+        apiClient<ImportSummary[]>('/imports')
+      ]);
+      setRecentRecords(recordsData.records);
+      setActiveGroups(groupsData);
+      setPendingImports(importsData);
+    } catch (err: any) {
+      setOverviewError(err.message || 'Failed to load overview data.');
+    }
+  };
+
   const handleRefreshAll = async () => {
     await fetchAccounts(false);
     if (selectedAccountId) {
       await fetchHistory(selectedAccountId);
     }
     await fetchExtraData();
+    await fetchOverviewData();
   };
 
   // Initial load
   useEffect(() => {
     fetchAccounts(true);
     fetchExtraData();
+    fetchOverviewData();
     setIdempotencyKey(generateIdempotencyKey());
   }, []);
 
@@ -253,17 +315,109 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full max-w-6xl mx-auto">
+    <PageShell>
+      <PageHeader
+        title="Overview"
+        description="Accounts, budgets, groups, history, imports, and analytics in one place."
+        actions={<Button variant="outline" onClick={handleRefreshAll}>Refresh</Button>}
+      />
       {globalError && (
-        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm">
-          {globalError}
-        </div>
+        <StateBlock type="error" title="Dashboard error" description={globalError} />
       )}
+      {overviewError && (
+        <StateBlock type="error" title="Overview error" description={overviewError} />
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <MetricCard label="Total Balance" value={`Rs ${totalBalance.toFixed(2)}`} detail={`${accounts.length} account${accounts.length === 1 ? '' : 's'}`} />
+        <MetricCard label="Budget Watch" value={budgetRisk.length} detail="categories closest to limit" />
+        <MetricCard label="Active Groups" value={activeGroups.length} detail={<Link to="/groups" className="text-accent">Open groups</Link>} />
+        <MetricCard label="Recent Activity" value={recentRecords.length} detail={<Link to="/history" className="text-accent">View history</Link>} />
+        <MetricCard label="Pending Imports" value={pendingImports.length} detail={<Link to="/imports" className="text-accent">Review imports</Link>} />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+            <h2 className="text-lg font-semibold">Budget Risk</h2>
+            <Link to="/#budgets" className="text-xs text-accent font-semibold">Budgets</Link>
+          </div>
+          {budgetRisk.length === 0 ? (
+            <StateBlock title="No budget limits yet" description="Create categories and limits to track spending pressure." />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {budgetRisk.map((budget: any) => (
+                <div key={budget.id || budget.categoryId} className="min-w-0">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="truncate font-semibold" title={budget.categoryName || budget.category?.name}>{budget.categoryName || budget.category?.name || 'Category'}</span>
+                    <span className="font-mono text-text-secondary shrink-0">{Math.round(budget.utilization * 100)}%</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded bg-background border border-border overflow-hidden">
+                    <div className="h-full bg-accent transition-all duration-200" style={{ width: `${Math.min(100, budget.utilization * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+            <h2 className="text-lg font-semibold">Recent Activity</h2>
+            <Link to="/history" className="text-xs text-accent font-semibold">Full history</Link>
+          </div>
+          {recentRecords.length === 0 ? (
+            <StateBlock title="No activity yet" description="Transfers and expenses will appear here." />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {recentRecords.map((record) => (
+                <Link key={`${record.type}-${record.id}`} to={`/history?q=${encodeURIComponent(record.description || record.accountName || '')}`} className="rounded border border-border bg-background p-3 hover:border-text-secondary/40 transition-colors min-w-0">
+                  <div className="flex justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge tone={record.type === 'EXPENSE' ? 'warning' : 'accent'}>{record.type}</StatusBadge>
+                        <span className="text-xs text-text-secondary truncate">{new Date(record.date).toLocaleDateString()}</span>
+                      </div>
+                      <div className="mt-1 text-sm truncate" title={record.description || record.accountName}>{record.description || record.accountName}</div>
+                    </div>
+                    <span className={`font-mono text-sm shrink-0 ${record.direction === 'IN' ? 'text-success' : 'text-danger'}`}>
+                      {record.direction === 'IN' ? '+' : '-'}Rs {record.amount.toFixed(2)}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+            <h2 className="text-lg font-semibold">Action Queue</h2>
+            <Link to="/imports" className="text-xs text-accent font-semibold">Imports</Link>
+          </div>
+          {pendingImports.length === 0 && activeGroups.length === 0 ? (
+            <StateBlock title="Nothing needs attention" description="Pending imports and active groups appear here." />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {pendingImports.length > 0 && (
+                <Link to="/imports" className="rounded border border-warning/30 bg-warning/10 p-3 text-warning text-sm font-semibold">
+                  {pendingImports.length} imported row{pendingImports.length === 1 ? '' : 's'} awaiting review
+                </Link>
+              )}
+              {activeGroups.slice(0, 3).map((group) => (
+                <Link key={group.id} to={`/groups/${group.id}`} className="rounded border border-border bg-background p-3 text-sm hover:border-text-secondary/40 transition-colors truncate" title={group.name}>
+                  Active group: {group.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
         {/* Left column: Accounts List & Create Account & Budgets */}
         <div className="flex flex-col gap-6 w-full">
-          <Card className="p-6 flex flex-col gap-4">
+          <Card id="accounts" className="p-6 flex flex-col gap-4 scroll-mt-24">
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h2 className="text-lg font-semibold text-text-primary tracking-tight">Your Accounts</h2>
               <Button 
@@ -351,12 +505,14 @@ export const Dashboard: React.FC = () => {
           </Card>
 
           {/* Budgets Panel */}
-          <BudgetsPanel budgets={budgets} loading={loadingExtra} onRefresh={fetchExtraData} />
+          <div id="budgets" className="scroll-mt-24">
+            <BudgetsPanel budgets={budgets} loading={loadingExtra} onRefresh={fetchExtraData} />
+          </div>
         </div>
 
         {/* Right column: Transfer Form & Transaction History & Expenses */}
         <div className="flex flex-col gap-6 w-full">
-          <Card className="p-6 flex flex-col gap-6">
+          <Card id="transfers" className="p-6 flex flex-col gap-6 scroll-mt-24">
             
             {/* Transfer Funds Form */}
             <div>
@@ -516,7 +672,7 @@ export const Dashboard: React.FC = () => {
           />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 };
 

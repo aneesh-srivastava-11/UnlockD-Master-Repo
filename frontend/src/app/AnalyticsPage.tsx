@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../api/client';
 import { Button } from '../components/ui/button';
@@ -124,13 +125,13 @@ export const AnalyticsPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {data.recurringExpenses.map((expense) => (
-              <Card key={expense.id} className="p-4 bg-background flex justify-between gap-4">
+              <Link key={expense.id} to={`/history?q=${encodeURIComponent(expense.merchant)}`} className="rounded-lg border border-border bg-background p-4 flex justify-between gap-4 hover:border-text-secondary/40 transition-colors min-w-0">
                 <div className="min-w-0">
                   <div className="font-semibold text-sm truncate">{expense.merchant}</div>
                   <div className="text-xs text-text-secondary">{expense.category} / {new Date(expense.date).toLocaleDateString()}</div>
                 </div>
                 <div className="font-mono text-danger text-sm shrink-0">-Rs {expense.amount.toFixed(2)}</div>
-              </Card>
+              </Link>
             ))}
           </div>
         )}

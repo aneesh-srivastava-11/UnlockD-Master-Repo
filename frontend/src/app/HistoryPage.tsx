@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Edit3, Filter, Search, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { Button } from '../components/ui/button';
@@ -50,6 +50,7 @@ interface RecordsResponse {
 const PAGE_SIZE = 25;
 
 export const HistoryPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [records, setRecords] = useState<MoneyRecord[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -58,8 +59,8 @@ export const HistoryPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [searchText, setSearchText] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchText, setSearchText] = useState(searchParams.get('q') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('q') || '');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [categoryId, setCategoryId] = useState('ALL');
