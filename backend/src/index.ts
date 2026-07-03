@@ -10,6 +10,8 @@ import groupRoutes from './routes/groupRoutes';
 import groupExpenseRoutes from './routes/groupExpenseRoutes';
 import settlementRoutes from './routes/settlementRoutes';
 import recordsRoutes from './routes/recordsRoutes';
+import importRoutes from './routes/importRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,8 @@ app.use('/groups', groupRoutes);
 app.use('/groups', groupExpenseRoutes);
 app.use('/', settlementRoutes);
 app.use('/records', recordsRoutes);
+app.use('/imports', importRoutes);
+app.use('/analytics', analyticsRoutes);
 
 // Global Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

@@ -43,6 +43,18 @@ export const TopBar: React.FC = () => {
             History
           </Link>
           <Link 
+            to="/imports" 
+            className="inline-flex items-center justify-center rounded border border-border bg-transparent text-text-primary hover:bg-surface-elevated text-xs font-semibold px-3 h-11 sm:h-9 transition-colors"
+          >
+            Imports
+          </Link>
+          <Link 
+            to="/analytics" 
+            className="inline-flex items-center justify-center rounded border border-border bg-transparent text-text-primary hover:bg-surface-elevated text-xs font-semibold px-3 h-11 sm:h-9 transition-colors"
+          >
+            Analytics
+          </Link>
+          <Link 
             to="/settings" 
             className="inline-flex items-center justify-center rounded border border-border bg-transparent text-text-primary hover:bg-surface-elevated text-xs font-semibold px-3 h-11 sm:h-9 transition-colors"
           >

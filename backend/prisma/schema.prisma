@@ -30,6 +30,7 @@ model User {
   expenseSplits    ExpenseSplit[]
   settlementsFrom  Settlement[]   @relation("SettlementFrom")
   settlementsTo    Settlement[]   @relation("SettlementTo")
+  importedTransactions ImportedTransaction[]
 }
 
 model Account {
@@ -43,6 +44,7 @@ model Account {
   sentTransactions     Transaction[] @relation("FromAccount")
   receivedTransactions Transaction[] @relation("ToAccount")
   expenses             Expense[]
+  importedTransactions ImportedTransaction[]
 }
 
 model Transaction {
@@ -72,6 +74,7 @@ model Category {
   expenses     Expense[]
   budgets      Budget[]
   transactions Transaction[]
+  importedTransactions ImportedTransaction[]
 
   @@unique([userId, name])
 }
@@ -88,6 +91,7 @@ model Expense {
   user        User     @relation(fields: [userId], references: [id])
   account     Account  @relation(fields: [accountId], references: [id])
   category    Category @relation(fields: [categoryId], references: [id])
+  importedTransaction ImportedTransaction?
 }
 
 model Budget {
@@ -107,6 +111,12 @@ model Budget {
 enum SettlementStatus {
   PENDING
   COMPLETED
+}
+
+enum ImportStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  REJECTED
 }
 
 model Group {
@@ -177,3 +187,23 @@ model Settlement {
   transaction  Transaction? @relation(fields: [transactionId], references: [id])
 }
 
+model ImportedTransaction {
+  id                  String       @id @default(uuid())
+  userId              String
+  accountId           String
+  source              String
+  rawDescription      String
+  merchant            String?
+  amount              Decimal      @db.Decimal(19, 4)
+  date                DateTime
+  suggestedCategoryId String?
+  isRecurring         Boolean      @default(false)
+  status              ImportStatus @default(PENDING_REVIEW)
+  linkedExpenseId     String?      @unique
+  createdAt           DateTime     @default(now())
+
+  user                User      @relation(fields: [userId], references: [id])
+  account             Account   @relation(fields: [accountId], references: [id])
+  suggestedCategory   Category? @relation(fields: [suggestedCategoryId], references: [id])
+  linkedExpense       Expense?  @relation(fields: [linkedExpenseId], references: [id])
+}

@@ -10,10 +10,14 @@
   },
   "dependencies": {
     "@prisma/client": "^5.12.1",
+    "@types/multer": "^2.2.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "csv-parse": "^7.0.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
     "zod": "^3.22.4"
   },

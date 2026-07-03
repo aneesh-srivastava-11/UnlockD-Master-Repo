@@ -9,6 +9,8 @@ import { SettingsPage } from './app/SettingsPage';
 import { GroupsPage } from './app/GroupsPage';
 import { GroupDetailsPage } from './app/GroupDetailsPage';
 import { HistoryPage } from './app/HistoryPage';
+import { ImportPage } from './app/ImportPage';
+import { AnalyticsPage } from './app/AnalyticsPage';
 import './App.css';
 
 function App() {
@@ -63,6 +65,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <HistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/imports"
+                element={
+                  <ProtectedRoute>
+                    <ImportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute>
+                    <AnalyticsPage />
                   </ProtectedRoute>
                 }
               />

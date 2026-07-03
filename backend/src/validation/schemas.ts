@@ -269,3 +269,63 @@ export const categorizeTransactionSchema = z.object({
     });
   }
 });
+
+/**
+ * Validation schema for POST /imports/upload multipart body
+ */
+export const uploadImportSchema = z.object({
+  accountId: z.string({
+    required_error: "Account ID is required"
+  }).uuid("Account ID must be a valid UUID")
+});
+
+/**
+ * Validation schema for GET /imports query parameters
+ */
+export const importQuerySchema = z.object({
+  status: z.enum(["PENDING_REVIEW", "CONFIRMED", "REJECTED"]).optional().default("PENDING_REVIEW")
+});
+
+/**
+ * Validation schema for PATCH /imports/:id
+ */
+export const updateImportSchema = z.object({
+  accountId: z.string().uuid("Account ID must be a valid UUID").optional(),
+  merchant: z.string().trim().nullable().optional(),
+  amount: z.number({
+    invalid_type_error: "Amount must be a number"
+  }).positive("Amount must be greater than zero").optional(),
+  date: z.string().refine(val => !isNaN(Date.parse(val)), { message: "Date must be a valid date string" }).optional(),
+  categoryId: z.string().uuid("Category ID must be a valid UUID").nullable().optional()
+}).superRefine((data, ctx) => {
+  if (data.accountId === undefined && data.merchant === undefined && data.amount === undefined && data.date === undefined && data.categoryId === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one field must be provided for update",
+      path: ["merchant"]
+    });
+  }
+});
+
+/**
+ * Validation schema for POST /imports/bulk-confirm
+ */
+export const bulkConfirmImportSchema = z.object({
+  ids: z.array(z.string().uuid("Each import ID must be a valid UUID")).min(1, "At least one import ID is required")
+});
+
+/**
+ * Validation schema for GET /analytics/spending
+ */
+export const analyticsQuerySchema = z.object({
+  startDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "startDate must be a valid date string" }).optional(),
+  endDate: z.string().refine(val => !isNaN(Date.parse(val)), { message: "endDate must be a valid date string" }).optional()
+}).superRefine((data, ctx) => {
+  if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "startDate must be before or equal to endDate",
+      path: ["startDate"]
+    });
+  }
+});
