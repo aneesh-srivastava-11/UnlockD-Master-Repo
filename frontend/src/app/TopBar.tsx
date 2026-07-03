@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export const TopBar: React.FC = () => {
@@ -14,6 +15,12 @@ export const TopBar: React.FC = () => {
       </div>
       <div className="top-bar-user">
         <span className="user-email">{user.email}</span>
+        <Link to="/" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          Dashboard
+        </Link>
+        <Link to="/settings" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          Settings
+        </Link>
         <button className="btn-secondary" onClick={logout}>
           Log Out
         </button>

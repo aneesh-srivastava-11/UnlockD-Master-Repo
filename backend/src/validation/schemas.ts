@@ -59,3 +59,64 @@ export const loginSchema = z.object({
   }).min(1, "Password cannot be empty")
 });
 
+/**
+ * Validation schema for POST /categories
+ */
+export const createCategorySchema = z.object({
+  name: z.string({
+    required_error: "Category name is required"
+  }).trim().min(1, "Category name cannot be empty")
+});
+
+/**
+ * Validation schema for POST /expenses
+ */
+export const createExpenseSchema = z.object({
+  accountId: z.string({
+    required_error: "Account ID is required"
+  }).uuid("Account ID must be a valid UUID"),
+  categoryId: z.string({
+    required_error: "Category ID is required"
+  }).uuid("Category ID must be a valid UUID"),
+  amount: z.number({
+    required_error: "Expense amount is required",
+    invalid_type_error: "Expense amount must be a number"
+  }).positive("Expense amount must be greater than zero"),
+  description: z.string().trim().optional()
+});
+
+/**
+ * Validation schema for PATCH /expenses/:id
+ */
+export const updateExpenseSchema = z.object({
+  amount: z.number({
+    invalid_type_error: "Expense amount must be a number"
+  }).positive("Expense amount must be greater than zero").optional(),
+  categoryId: z.string().uuid("Category ID must be a valid UUID").optional(),
+  description: z.string().trim().optional()
+}).refine(data => data.amount !== undefined || data.categoryId !== undefined || data.description !== undefined, {
+  message: "At least one field (amount, categoryId, or description) must be provided for update",
+  path: ["amount"]
+});
+
+/**
+ * Validation schema for POST /budgets
+ */
+export const upsertBudgetSchema = z.object({
+  categoryId: z.string({
+    required_error: "Category ID is required"
+  }).uuid("Category ID must be a valid UUID"),
+  monthlyLimit: z.number({
+    required_error: "Monthly limit is required",
+    invalid_type_error: "Monthly limit must be a number"
+  }).positive("Monthly limit must be greater than zero")
+});
+
+/**
+ * Validation schema for GET /expenses query parameters
+ */
+export const expenseQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be in YYYY-MM format").optional()
+});
+
+

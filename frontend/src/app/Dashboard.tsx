@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, ApiError } from '../api/client';
 import './app.css';
+import { BudgetsPanel } from './BudgetsPanel';
+import { ExpensesPanel } from './ExpensesPanel';
 
 interface Account {
   id: string;
@@ -23,6 +25,12 @@ export const Dashboard: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // Smart Budgeting States
+  const [categories, setCategories] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loadingExtra, setLoadingExtra] = useState(false);
 
   // Loading & Error States
   const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -89,9 +97,35 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Fetch categories, budgets, and expenses
+  const fetchExtraData = async () => {
+    setLoadingExtra(true);
+    try {
+      const cats = await apiClient<any[]>('/categories');
+      const bdg = await apiClient<any[]>('/budgets');
+      const exp = await apiClient<any[]>('/expenses');
+      setCategories(cats);
+      setBudgets(bdg);
+      setExpenses(exp);
+    } catch (err) {
+      console.error("Error loading category/budget/expense details", err);
+    } finally {
+      setLoadingExtra(false);
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    await fetchAccounts(false);
+    if (selectedAccountId) {
+      await fetchHistory(selectedAccountId);
+    }
+    await fetchExtraData();
+  };
+
   // Initial load
   useEffect(() => {
     fetchAccounts(true);
+    fetchExtraData();
     setIdempotencyKey(generateIdempotencyKey());
   }, []);
 
@@ -198,11 +232,8 @@ export const Dashboard: React.FC = () => {
       // Reset idempotency key for the next transfer
       setIdempotencyKey(generateIdempotencyKey());
 
-      // Refresh current balances and transaction log
-      await fetchAccounts(false);
-      if (selectedAccountId) {
-        await fetchHistory(selectedAccountId);
-      }
+      // Refresh current balances, transaction log, budgets, and expenses
+      await handleRefreshAll();
     } catch (err: any) {
       // If server returned 400 Bad Request with a FAILED transaction (overdraft)
       if (err instanceof ApiError && err.data?.transaction) {
@@ -223,7 +254,8 @@ export const Dashboard: React.FC = () => {
 
       <div className="dashboard-grid">
         {/* Left column: Accounts List & Create Account */}
-        <div className="panel accounts-panel">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="panel accounts-panel">
           <div className="panel-header">
             <h2>Your Accounts</h2>
             <button className="btn-icon" onClick={() => fetchAccounts(false)} title="Refresh accounts">
@@ -290,10 +322,13 @@ export const Dashboard: React.FC = () => {
               </button>
             </form>
           </div>
+          </div>
+          <BudgetsPanel budgets={budgets} loading={loadingExtra} onRefresh={fetchExtraData} />
         </div>
 
         {/* Right column: Transfer Form & Transaction History */}
-        <div className="panel transfer-history-panel">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="panel transfer-history-panel">
 
           {/* Transfer Funds Form */}
           <div className="transfer-section">
@@ -408,6 +443,14 @@ export const Dashboard: React.FC = () => {
             )}
           </div>
         </div>
+        <ExpensesPanel 
+          accounts={accounts} 
+          categories={categories} 
+          expenses={expenses} 
+          loading={loadingExtra} 
+          onRefresh={handleRefreshAll} 
+        />
+      </div>
       </div>
     </div>
   );

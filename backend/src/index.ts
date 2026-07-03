@@ -3,6 +3,9 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes';
 import accountRoutes from './routes/accountRoutes';
 import transactionRoutes from './routes/transactionRoutes';
+import categoryRoutes from './routes/categoryRoutes';
+import expenseRoutes from './routes/expenseRoutes';
+import budgetRoutes from './routes/budgetRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 // Enable Cross-Origin Resource Sharing (CORS) for frontend interaction
 app.use(cors({
   origin: '*', // Allow all origins for the build-a-thon, or customize if necessary
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -21,6 +24,9 @@ app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/accounts', accountRoutes);
 app.use('/transactions', transactionRoutes);
+app.use('/categories', categoryRoutes);
+app.use('/expenses', expenseRoutes);
+app.use('/budgets', budgetRoutes);
 
 // Global Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
