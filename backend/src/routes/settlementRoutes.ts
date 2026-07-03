@@ -167,6 +167,44 @@ router.post('/settlements/:id/pay', async (req: AuthenticatedRequest, res: Respo
       });
     }
 
+    // Ensure "Settlement" category exists for the debtor
+    let settlementCategory = await prisma.category.findFirst({
+      where: {
+        userId,
+        name: {
+          equals: 'Settlement',
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if (!settlementCategory) {
+      settlementCategory = await prisma.category.create({
+        data: {
+          userId,
+          name: 'Settlement'
+        }
+      });
+    }
+
+    // Get group name
+    const groupData = await prisma.group.findUnique({
+      where: { id: settlement.groupId },
+      select: { name: true }
+    });
+    const groupName = groupData?.name || 'Group';
+
+    // Log the automatic expense record without decrementing the balance again
+    await prisma.expense.create({
+      data: {
+        userId,
+        accountId,
+        categoryId: settlementCategory.id,
+        amount: settlement.amount,
+        description: `Settlement: ${groupName}`
+      }
+    });
+
     // 7. Update settlement record
     const updatedSettlement = await prisma.settlement.update({
       where: { id: settlementId },
