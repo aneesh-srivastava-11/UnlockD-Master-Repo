@@ -372,7 +372,7 @@ export const HistoryPage: React.FC = () => {
             const amountPrefix = isOut ? '-' : '+';
 
             return (
-              <Card key={`${record.type}-${record.id}`} className="p-4 bg-surface flex flex-col md:grid md:grid-cols-[120px_1fr_140px_96px] gap-3 md:items-center">
+              <Card key={`${record.type}-${record.id}`} className="p-4 bg-surface flex flex-col md:grid md:grid-cols-[120px_1fr_110px_160px] gap-3 md:items-center">
                 <div className="flex md:flex-col items-center md:items-start gap-2">
                   <StatusBadge tone={record.type === 'TRANSFER' ? 'accent' : 'warning'}>{record.type}</StatusBadge>
                   <span className="text-xs text-text-secondary">{new Date(record.date).toLocaleDateString()}</span>
