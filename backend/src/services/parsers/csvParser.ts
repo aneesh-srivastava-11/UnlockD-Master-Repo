@@ -68,9 +68,15 @@ export function parseCsvStatement(buffer: Buffer): ParseResult {
   for (const record of records) {
     const date = new Date(record[dateColumn]);
     const amount = parseAmount(record[amountColumn]);
-    const rawDescription = String(record[descriptionColumn] ?? '').trim();
+    let rawDescription = String(record[descriptionColumn] ?? '').trim();
 
-    if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount <= 0 || !rawDescription) {
+    if (!rawDescription) {
+      const typeCol = findColumn(headers, ['type', 'transaction type']);
+      const typeVal = typeCol ? String(record[typeCol]).trim().toUpperCase() : '';
+      rawDescription = typeVal === 'TRANSFER' ? 'Transfer' : 'No description';
+    }
+
+    if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount <= 0) {
       skipped += 1;
       continue;
     }

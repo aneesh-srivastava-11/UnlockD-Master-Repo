@@ -11,9 +11,9 @@ export const PageHeader: React.FC<{
   description?: string;
   actions?: React.ReactNode;
 }> = ({ title, description, actions }) => (
-  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-4">
+  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-4 w-full">
     <div className="min-w-0">
-      <h1 className="text-2xl font-semibold text-text-primary truncate" title={title}>{title}</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary truncate" title={title}>{title}</h1>
       {description && <p className="text-sm text-text-secondary mt-1">{description}</p>}
     </div>
     {actions && <div className="flex flex-wrap gap-2 shrink-0">{actions}</div>}
@@ -41,11 +41,24 @@ export const StateBlock: React.FC<{
   action?: React.ReactNode;
 }> = ({ type = 'empty', title, description, action }) => (
   <div className={cn(
-    'rounded border bg-surface p-6 text-center',
-    type === 'error' ? 'border-danger text-danger' : 'border-border text-text-secondary'
+    'rounded-lg border text-center p-6 transition-all',
+    type === 'error' 
+      ? 'border-danger/30 bg-danger/5 text-danger' 
+      : type === 'loading'
+        ? 'border-border bg-surface'
+        : 'border-dashed border-border/60 bg-surface/30 text-text-secondary'
   )}>
-    <div className={cn('text-sm font-semibold', type === 'error' ? 'text-danger' : 'text-text-primary')}>{title}</div>
-    {description && <div className="text-sm mt-1 text-text-secondary">{description}</div>}
+    <div className={cn(
+      'text-sm font-semibold tracking-tight', 
+      type === 'error' ? 'text-danger' : type === 'loading' ? 'text-text-primary' : 'text-text-secondary/90'
+    )}>
+      {title}
+    </div>
+    {description && (
+      <div className="text-xs mt-1.5 text-text-secondary/70 max-w-md mx-auto leading-relaxed">
+        {description}
+      </div>
+    )}
     {action && <div className="mt-4 flex justify-center">{action}</div>}
   </div>
 );
@@ -56,7 +69,7 @@ export const MetricCard: React.FC<{
   detail?: React.ReactNode;
 }> = ({ label, value, detail }) => (
   <Card className="p-4 bg-surface min-w-0">
-    <div className="text-xs font-semibold uppercase tracking-normal text-text-secondary">{label}</div>
+    <div className="text-xs font-bold text-text-secondary">{label}</div>
     <div className="mt-2 text-xl font-semibold text-text-primary font-mono truncate">{value}</div>
     {detail && <div className="mt-1 text-xs text-text-secondary truncate">{detail}</div>}
   </Card>

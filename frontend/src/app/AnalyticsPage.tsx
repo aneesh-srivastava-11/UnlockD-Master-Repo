@@ -6,6 +6,9 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { PageHeader, PageShell, StateBlock } from './shared';
+import { Skeleton } from '../components/ui/skeleton';
+import { FullPageError } from '../components/ErrorDisplay';
 
 interface AnalyticsData {
   byCategory: Array<{ category: string; total: number }>;
@@ -17,8 +20,14 @@ const currency = (value: unknown) => `Rs ${Number(value || 0).toFixed(2)}`;
 
 export const AnalyticsPage: React.FC = () => {
   const [data, setData] = useState<AnalyticsData>({ byCategory: [], byMonth: [], recurringExpenses: [] });
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getStartOfMonthStr = () => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  };
+  const [startDate, setStartDate] = useState(getStartOfMonthStr());
+  const [endDate, setEndDate] = useState(getTodayStr());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,15 +53,10 @@ export const AnalyticsPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-5 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Analytics</h1>
-          <p className="text-sm text-text-secondary mt-1">Committed expense trends and recurring imported charges.</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader title="Analytics" description="Committed expense trends and recurring imported charges." />
 
-      {error && <div className="p-3 rounded border border-danger bg-danger/10 text-danger text-sm">{error}</div>}
+      {error && <StateBlock type="error" title="Analytics error" description={error} />}
 
       <Card className="p-5">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
@@ -66,7 +70,7 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <Button onClick={loadAnalytics}>Apply</Button>
         </div>
-      </Card>
+      </Card>      {error && <FullPageError title="Failed to Load Analytics" description={error} onRetry={loadAnalytics} />}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <Card className="p-5">
@@ -74,9 +78,16 @@ export const AnalyticsPage: React.FC = () => {
             <h2 className="text-lg font-semibold">Category Breakdown</h2>
           </div>
           {loading ? (
-            <div className="h-[320px] flex items-center justify-center text-text-secondary text-sm">Loading chart...</div>
+            <div className="flex flex-col gap-3 h-[320px] justify-center">
+              <Skeleton className="h-6 w-3/4 rounded animate-pulse" />
+              <Skeleton className="h-6 w-1/2 rounded animate-pulse" />
+              <Skeleton className="h-6 w-5/8 rounded animate-pulse" />
+            </div>
           ) : data.byCategory.length === 0 ? (
-            <div className="h-[320px] flex items-center justify-center text-text-secondary text-sm">No expenses in this range.</div>
+            <StateBlock 
+              title="No expenses in this range" 
+              description="Log personal expenses or confirm imports to see category spending breakdowns."
+            />
           ) : (
             <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -97,7 +108,14 @@ export const AnalyticsPage: React.FC = () => {
             <h2 className="text-lg font-semibold">Monthly Spend Trend</h2>
           </div>
           {loading ? (
-            <div className="h-[320px] flex items-center justify-center text-text-secondary text-sm">Loading chart...</div>
+            <div className="h-[320px] flex items-end justify-between gap-2 border-b border-border/40 pb-4">
+              <Skeleton className="h-[40%] w-[12%] rounded-t animate-pulse" />
+              <Skeleton className="h-[65%] w-[12%] rounded-t animate-pulse" />
+              <Skeleton className="h-[50%] w-[12%] rounded-t animate-pulse" />
+              <Skeleton className="h-[80%] w-[12%] rounded-t animate-pulse" />
+              <Skeleton className="h-[35%] w-[12%] rounded-t animate-pulse" />
+              <Skeleton className="h-[90%] w-[12%] rounded-t animate-pulse" />
+            </div>
           ) : (
             <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -106,7 +124,7 @@ export const AnalyticsPage: React.FC = () => {
                   <XAxis dataKey="month" stroke="var(--text-secondary)" />
                   <YAxis stroke="var(--text-secondary)" tickFormatter={(value) => `Rs ${value}`} />
                   <Tooltip formatter={(value) => currency(value)} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-                  <Line type="monotone" dataKey="total" stroke="var(--success)" strokeWidth={2} dot={{ fill: 'var(--success)' }} />
+                  <Line type="monotone" dataKey="total" stroke="var(--accent)" strokeWidth={2} dot={{ fill: 'var(--accent)' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -119,9 +137,15 @@ export const AnalyticsPage: React.FC = () => {
           <h2 className="text-lg font-semibold">Recurring Expenses</h2>
         </div>
         {loading ? (
-          <div className="py-8 text-center text-text-secondary text-sm">Loading recurring expenses...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Skeleton className="h-[68px] w-full rounded-lg animate-pulse" />
+            <Skeleton className="h-[68px] w-full rounded-lg animate-pulse" />
+          </div>
         ) : data.recurringExpenses.length === 0 ? (
-          <div className="py-8 text-center text-text-secondary text-sm">No recurring imported expenses confirmed yet.</div>
+          <StateBlock 
+            title="No recurring imported expenses confirmed yet" 
+            description="Recurring expenses are detected automatically from your import cadence (2+ occurrences of similar amounts and merchants)."
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {data.recurringExpenses.map((expense) => (
@@ -136,7 +160,7 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         )}
       </Card>
-    </div>
+    </PageShell>
   );
 };
 

@@ -31,6 +31,7 @@ model User {
   settlementsFrom  Settlement[]   @relation("SettlementFrom")
   settlementsTo    Settlement[]   @relation("SettlementTo")
   importedTransactions ImportedTransaction[]
+  recurringSuggestions RecurringSuggestion[]
 }
 
 model Account {
@@ -45,6 +46,7 @@ model Account {
   receivedTransactions Transaction[] @relation("ToAccount")
   expenses             Expense[]
   importedTransactions ImportedTransaction[]
+  recurringSuggestions RecurringSuggestion[]
 }
 
 model Transaction {
@@ -75,6 +77,7 @@ model Category {
   budgets      Budget[]
   transactions Transaction[]
   importedTransactions ImportedTransaction[]
+  recurringSuggestions RecurringSuggestion[]
 
   @@unique([userId, name])
 }
@@ -92,6 +95,7 @@ model Expense {
   account     Account  @relation(fields: [accountId], references: [id])
   category    Category @relation(fields: [categoryId], references: [id])
   importedTransaction ImportedTransaction?
+  recurringSuggestion RecurringSuggestion?
 }
 
 model Budget {
@@ -206,4 +210,22 @@ model ImportedTransaction {
   account             Account   @relation(fields: [accountId], references: [id])
   suggestedCategory   Category? @relation(fields: [suggestedCategoryId], references: [id])
   linkedExpense       Expense?  @relation(fields: [linkedExpenseId], references: [id])
+}
+
+model RecurringSuggestion {
+  id              String   @id @default(uuid())
+  userId          String
+  accountId       String
+  merchant        String
+  suggestedAmount Decimal  @db.Decimal(19, 4)
+  categoryId      String?
+  suggestedDate   DateTime
+  status          ImportStatus  // reuse existing enum: PENDING_REVIEW, CONFIRMED, REJECTED
+  linkedExpenseId String?  @unique
+  createdAt       DateTime @default(now())
+
+  user            User      @relation(fields: [userId], references: [id])
+  account         Account   @relation(fields: [accountId], references: [id])
+  category        Category? @relation(fields: [categoryId], references: [id])
+  linkedExpense   Expense?  @relation(fields: [linkedExpenseId], references: [id])
 }

@@ -11,17 +11,23 @@ import { GroupDetailsPage } from './app/GroupDetailsPage';
 import { HistoryPage } from './app/HistoryPage';
 import { ImportPage } from './app/ImportPage';
 import { AnalyticsPage } from './app/AnalyticsPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { Toaster } from 'sonner';
+import { CommandPalette } from './components/CommandPalette';
 import './App.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <div className="app-shell">
-          {/* TopBar will automatically display only when authenticated */}
-          <TopBar />
-          
-          <main className="app-main">
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <div className="app-shell">
+            {/* TopBar will automatically display only when authenticated */}
+            <TopBar />
+            <Toaster position="top-right" theme="dark" closeButton richColors />
+            <CommandPalette />
+            
+            <main className="app-main">
             <Routes>
               {/* Unauthenticated Auth Routes */}
               <Route path="/login" element={<LoginPage />} />
@@ -90,8 +96,9 @@ function App() {
             </Routes>
           </main>
         </div>
-      </BrowserRouter>
-    </AuthProvider>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

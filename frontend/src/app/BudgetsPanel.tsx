@@ -2,6 +2,8 @@ import React from 'react';
 import { Card } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
 import { Button } from '../components/ui/button';
+import { Skeleton } from '../components/ui/skeleton';
+import { StateBlock } from './shared';
 
 export interface BudgetUtilization {
   id: string;
@@ -36,12 +38,21 @@ export const BudgetsPanel: React.FC<BudgetsPanelProps> = ({ budgets, loading, on
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-text-secondary text-sm">Loading budgets...</div>
-      ) : budgets.length === 0 ? (
-        <div className="py-8 text-center text-text-secondary text-sm">
-          No budgets configured for this month. 
-          Go to Settings to set monthly limits for your categories.
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
         </div>
+      ) : budgets.length === 0 ? (
+        <StateBlock
+          title="No budgets configured"
+          description="Budgets let you set monthly spending caps on categories (like Food or Utilities) to keep your expenses in check."
+          action={
+            <Button onClick={() => window.location.href = '/settings'} size="sm">
+              Configure Budgets
+            </Button>
+          }
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {budgets.map((b) => {

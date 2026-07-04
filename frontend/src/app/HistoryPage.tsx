@@ -8,6 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { PageHeader, PageShell, StateBlock, StatusBadge } from './shared';
+import { Skeleton } from '../components/ui/skeleton';
+import { FullPageError } from '../components/ErrorDisplay';
 
 interface Account {
   id: string;
@@ -278,15 +281,12 @@ export const HistoryPage: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col gap-5 p-4 sm:p-6 w-full max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Transactions</h1>
-          <p className="text-sm text-text-secondary mt-1">Unified transfer and expense history</p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {filtersActive ? (
+    <PageShell>
+      <PageHeader
+        title="Transactions"
+        description="Unified transfer and expense history."
+        actions={
+          filtersActive ? (
             <>
               <Button variant="secondary" className="gap-2" onClick={() => exportRecords('csv', true)} disabled={!!exporting}>
                 <Download className="h-4 w-4" /> Filtered CSV
@@ -310,11 +310,11 @@ export const HistoryPage: React.FC = () => {
                 <Download className="h-4 w-4" /> Export PDF
               </Button>
             </>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
-      {error && <div className="p-3 rounded border border-danger bg-danger/10 text-danger text-sm">{error}</div>}
+      {error && <FullPageError title="Failed to Load History" description={error} onRetry={loadRecords} />}
 
       <Card className="p-4 flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row gap-3">
@@ -350,23 +350,31 @@ export const HistoryPage: React.FC = () => {
       </Card>
 
       {loading ? (
-        <div className="py-14 text-center text-text-secondary text-sm border border-border rounded bg-surface">Loading history...</div>
-      ) : records.length === 0 ? (
-        <div className="py-14 text-center border border-border rounded bg-surface">
-          <div className="text-text-primary font-semibold">No records found</div>
-          <div className="text-text-secondary text-sm mt-1">Try adjusting filters or export all history.</div>
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
+          <Skeleton className="h-[88px] w-full rounded-lg animate-pulse" />
         </div>
+      ) : records.length === 0 ? (
+        <StateBlock 
+          title="No transactions found" 
+          description={
+            filtersActive 
+              ? 'No transactions match your current search and filter settings. Try clearing some filters.' 
+              : 'All your logged expenses, transfers, and settled balances will appear here in a unified chronological history log.'
+          }
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {records.map((record) => {
             const isOut = record.direction === 'OUT';
             const amountPrefix = isOut ? '-' : '+';
-            const typeClass = record.type === 'TRANSFER' ? 'bg-accent/10 text-accent' : 'bg-warning/10 text-warning';
 
             return (
               <Card key={`${record.type}-${record.id}`} className="p-4 bg-surface flex flex-col md:grid md:grid-cols-[120px_1fr_140px_96px] gap-3 md:items-center">
                 <div className="flex md:flex-col items-center md:items-start gap-2">
-                  <span className={`text-[11px] font-bold px-2 py-1 rounded ${typeClass}`}>{record.type}</span>
+                  <StatusBadge tone={record.type === 'TRANSFER' ? 'accent' : 'warning'}>{record.type}</StatusBadge>
                   <span className="text-xs text-text-secondary">{new Date(record.date).toLocaleDateString()}</span>
                 </div>
 
@@ -385,7 +393,7 @@ export const HistoryPage: React.FC = () => {
                 </div>
 
                 <div className="flex md:justify-end items-center gap-2">
-                  <span className="text-[10px] px-2 py-1 rounded bg-surface-elevated border border-border text-text-secondary">{record.status}</span>
+                  <StatusBadge tone={record.status === 'COMPLETED' ? 'success' : record.status === 'FAILED' ? 'danger' : 'default'}>{record.status}</StatusBadge>
                   {record.type === 'TRANSFER' ? (
                     <Button type="button" size="icon" variant="ghost" title="Edit transaction details" onClick={() => startTransactionEdit(record)}>
                       <Edit3 className="h-4 w-4" />
@@ -440,7 +448,7 @@ export const HistoryPage: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 };
 

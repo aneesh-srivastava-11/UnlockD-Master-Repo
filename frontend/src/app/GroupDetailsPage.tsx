@@ -8,6 +8,8 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { PageHeader, PageShell, StateBlock, StatusBadge } from './shared';
+import { toast } from 'sonner';
 
 interface GroupMember {
   userId: string;
@@ -154,9 +156,11 @@ export const GroupDetailsPage: React.FC = () => {
         bodyData: { email: newMemberEmail.trim() }
       });
       setNewMemberEmail('');
+      toast.success('Member added successfully.');
       await fetchGroupDetails();
     } catch (err: any) {
       setAddMemberError(err.message || 'Failed to add member.');
+      toast.error(err.message || 'Failed to add member.');
     } finally {
       setAddMemberLoading(false);
     }
@@ -212,9 +216,11 @@ export const GroupDetailsPage: React.FC = () => {
       setExpenseDesc('');
       setExpenseAmount('');
       setCustomShares({});
+      toast.success('Group expense added successfully.');
       await fetchGroupDetails();
     } catch (err: any) {
       setAddExpenseError(err.message || 'Failed to record expense.');
+      toast.error(err.message || 'Failed to record expense.');
     } finally {
       setAddExpenseLoading(false);
     }
@@ -225,9 +231,10 @@ export const GroupDetailsPage: React.FC = () => {
     setSettleLoading(true);
     try {
       await apiClient(`/groups/${id}/settle`, { method: 'POST' });
+      toast.success('Balances settled up successfully!');
       await fetchGroupDetails();
     } catch (err: any) {
-      alert(err.message || 'Failed to calculate settlements.');
+      toast.error(err.message || 'Failed to calculate settlements.');
     } finally {
       setSettleLoading(false);
     }
@@ -259,6 +266,7 @@ export const GroupDetailsPage: React.FC = () => {
       });
 
       setActivePaySettlement(null);
+      toast.success('Settlement marked as paid successfully!');
       await fetchGroupDetails();
       await fetchUserAccounts(); // Refresh sender balance
 
@@ -269,6 +277,7 @@ export const GroupDetailsPage: React.FC = () => {
       }
     } catch (err: any) {
       setPayError(err.message || 'Failed to complete payment.');
+      toast.error(err.message || 'Failed to complete payment.');
     } finally {
       setPayLoading(false);
     }
@@ -277,43 +286,34 @@ export const GroupDetailsPage: React.FC = () => {
 
 
   if (loading) {
-    return <div className="py-16 text-center text-text-secondary text-sm">Loading group details...</div>;
+    return <PageShell><StateBlock type="loading" title="Loading group details..." /></PageShell>;
   }
 
   if (error || !group) {
     return (
-      <div className="p-6 max-w-4xl mx-auto w-full">
-        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm mb-4">{error || 'Group not found'}</div>
+      <PageShell>
+        <StateBlock type="error" title="Group error" description={error || 'Group not found'} />
         <Link to="/groups" className="text-accent underline text-sm">Back to Groups</Link>
-      </div>
+      </PageShell>
     );
   }
 
   const isCreator = group.createdBy === currentUser?.id;
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border pb-4 gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-text-primary tracking-tight">{group.name}</h1>
-            {group.isSettled ? (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-success/15 text-success font-mono">
-                SETTLED
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-warning/15 text-warning font-mono">
-                ACTIVE
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-text-secondary mt-1">Created on {new Date(group.createdAt).toLocaleDateString()}</p>
-        </div>
-        <Link to="/groups" className="text-accent underline text-sm self-start sm:self-auto">
-          Back to Groups
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={group.name}
+        description={`Created on ${new Date(group.createdAt).toLocaleDateString()}`}
+        actions={
+          <>
+            <StatusBadge tone={group.isSettled ? 'success' : 'warning'}>{group.isSettled ? 'SETTLED' : 'ACTIVE'}</StatusBadge>
+            <Link to="/groups" className="inline-flex items-center justify-center rounded border border-border bg-transparent text-text-primary hover:bg-surface-elevated text-xs font-semibold px-3 h-10 transition-colors">
+              Back to Groups
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
         {/* Left Column: Members list & Actions */}
@@ -324,11 +324,9 @@ export const GroupDetailsPage: React.FC = () => {
             <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
               {group.members.map(m => (
                 <div key={m.userId} className="flex justify-between items-center text-xs p-2.5 rounded border border-border bg-background">
-                  <span className="text-text-primary truncate">{m.user.email}</span>
+                  <span className="text-text-primary truncate" title={m.user.email}>{m.user.email}</span>
                   {m.userId === group.createdBy && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent font-mono shrink-0">
-                      CREATOR
-                    </span>
+                    <StatusBadge tone="accent">CREATOR</StatusBadge>
                   )}
                 </div>
               ))}
@@ -361,7 +359,9 @@ export const GroupDetailsPage: React.FC = () => {
           {isCreator && !group.isSettled && group.settlements.length === 0 && (
             <Card className="p-5 flex flex-col gap-3">
               <h2 className="text-sm font-semibold text-text-primary">Creator Settlement Control</h2>
-              <p className="text-xs text-text-secondary">Click Settle Up to net balances and generate settlements.</p>
+              <p className="text-xs text-text-secondary">
+                This calculates the minimum payments needed to settle everyone up. Click below to net balances and generate settlements.
+              </p>
               <Button onClick={handleSettleUp} disabled={settleLoading} className="w-full mt-1.5 h-11">
                 {settleLoading ? 'Calculating Net Flow...' : 'Settle Up'}
               </Button>
@@ -381,16 +381,13 @@ export const GroupDetailsPage: React.FC = () => {
               <div className="flex flex-col gap-3">
                 {group.settlements.map((settlement) => {
                   const isDebtor = settlement.fromUserId === currentUser?.id;
-                  const statusBadgeClass = settlement.status === 'COMPLETED' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning';
                   
                   return (
                     <Card key={settlement.id} className="p-4 bg-background border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${statusBadgeClass}`}>
-                            {settlement.status}
-                          </span>
-                          <span className="font-semibold text-sm text-text-primary">
+                          <StatusBadge tone={settlement.status === 'COMPLETED' ? 'success' : 'warning'}>{settlement.status}</StatusBadge>
+                          <span className="font-semibold text-sm text-text-primary break-words">
                             {settlement.fromUser.email} pays {settlement.toUser.email}
                           </span>
                         </div>
@@ -532,6 +529,26 @@ export const GroupDetailsPage: React.FC = () => {
                         Target: ₹{totalExpenseNum.toFixed(2)}
                       </span>
                     </div>
+
+                    {/* Live running total message */}
+                    <div className={`text-xs mt-2 font-semibold p-2.5 rounded-lg border flex items-center gap-2 ${
+                      Math.abs(totalExpenseNum - getCustomSum()) < 0.011 && totalExpenseNum > 0
+                        ? 'bg-success/5 border-success/30 text-success'
+                        : (totalExpenseNum - getCustomSum()) > 0
+                          ? 'bg-warning/5 border-warning/30 text-warning'
+                          : 'bg-danger/5 border-danger/30 text-danger'
+                    }`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                      <span>
+                        ₹{getCustomSum().toFixed(2)} of ₹{totalExpenseNum.toFixed(2)} allocated — {
+                          Math.abs(totalExpenseNum - getCustomSum()) < 0.011 && totalExpenseNum > 0
+                            ? 'fully allocated'
+                            : (totalExpenseNum - getCustomSum()) > 0
+                              ? `₹${(totalExpenseNum - getCustomSum()).toFixed(2)} remaining`
+                              : `₹${Math.abs(totalExpenseNum - getCustomSum()).toFixed(2)} over-allocated`
+                        }
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -553,7 +570,7 @@ export const GroupDetailsPage: React.FC = () => {
             </div>
 
             {group.expenses.length === 0 ? (
-              <div className="py-8 text-center text-text-secondary text-sm">No shared expenses logged yet.</div>
+              <StateBlock title="No shared expenses logged yet" />
             ) : (
               <div className="flex flex-col gap-4">
                 {group.expenses.map((expense) => (
@@ -672,7 +689,7 @@ export const GroupDetailsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </PageShell>
   );
 };
 

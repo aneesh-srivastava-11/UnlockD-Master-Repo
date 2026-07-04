@@ -4,6 +4,9 @@ import { ParsedImportRow, ParseResult } from './csvParser';
 const datePattern = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})/;
 const amountPattern = /(?:₹|Rs\.?)?\s*([+-]?\d[\d,]*(?:\.\d{1,2})?|\(\d[\d,]*(?:\.\d{1,2})?\))/g;
 
+// Premium unified PDF format line parser regex
+const lineRegex = /^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:,\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)?\s+(TRANSFER|EXPENSE)\s+(.+?)\s+(\S+)\s+([+-]?(?:₹|Rs\.?)?\s*[\d,]+(?:\.\d{1,2})?)\s+(.+?)\s+(COMPLETED|PENDING|FAILED)/i;
+
 function parseLooseDate(value: string) {
   const normalized = value.replace(/-/g, '/');
   const parts = normalized.split('/');
@@ -37,6 +40,45 @@ export async function parsePdfStatement(buffer: Buffer): Promise<ParseResult> {
   let skipped = 0;
 
   for (const line of lines) {
+    // Skip header/footer/metadata rows to prevent incorrect transaction logs
+    if (
+      line.toLowerCase().includes('generated on:') ||
+      line.toLowerCase().includes('applied filters:') ||
+      line.toLowerCase().includes('report metadata') ||
+      line.toLowerCase().includes('financista -') ||
+      line.toLowerCase().includes('page ')
+    ) {
+      skipped += 1;
+      continue;
+    }
+
+    // 1. Try to match the premium unified report format first
+    const regexMatch = line.match(lineRegex);
+    if (regexMatch) {
+      const date = parseLooseDate(regexMatch[1]);
+      const amount = parseAmount(regexMatch[5]);
+      let rawDescription = regexMatch[3].trim();
+
+      // Normalize fallbacks
+      if (rawDescription.toLowerCase() === 'no description' || !rawDescription) {
+        rawDescription = regexMatch[2].toUpperCase() === 'TRANSFER' ? 'Transfer' : 'No description';
+      }
+
+      if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount <= 0) {
+        skipped += 1;
+        continue;
+      }
+
+      rows.push({
+        date,
+        amount,
+        rawDescription,
+        merchant: rawDescription
+      });
+      continue;
+    }
+
+    // 2. Fallback for custom/third-party PDF bank statements
     const dateMatch = line.match(datePattern);
     const amountMatches = [...line.matchAll(amountPattern)];
     const amountMatch = amountMatches[amountMatches.length - 1];
@@ -48,13 +90,17 @@ export async function parsePdfStatement(buffer: Buffer): Promise<ParseResult> {
 
     const date = parseLooseDate(dateMatch[1]);
     const amount = parseAmount(amountMatch[1]);
-    const rawDescription = line
+    let rawDescription = line
       .replace(dateMatch[0], '')
       .replace(amountMatch[0], '')
       .replace(/\s+/g, ' ')
       .trim();
 
-    if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount <= 0 || !rawDescription) {
+    if (!rawDescription) {
+      rawDescription = 'No description';
+    }
+
+    if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount <= 0) {
       skipped += 1;
       continue;
     }

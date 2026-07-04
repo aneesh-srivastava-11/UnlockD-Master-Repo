@@ -48,9 +48,16 @@ export const SignupPage: React.FC = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="brand-logo">F</div>
-          <h1>Create account</h1>
-          <p>Get started with expense management today</p>
+          <div className="flex justify-center mb-6">
+            <div className="flex items-center gap-2.5 bg-surface-elevated px-4 py-2 rounded-xl border border-border/80 shadow-inner">
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-accent text-white font-mono font-bold text-lg shadow-lg shadow-accent/20">
+                F
+              </span>
+              <span className="font-bold text-text-primary text-xl tracking-tight">Financista</span>
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-1">Create account</h1>
+          <p className="text-sm text-text-secondary">Get started with premium money management</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { PageHeader, PageShell, StateBlock, StatusBadge } from './shared';
+import { Skeleton } from '../components/ui/skeleton';
+import { toast } from 'sonner';
 
 interface Group {
   id: string;
@@ -24,6 +27,7 @@ interface Group {
 
 export const GroupsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeGroups, setActiveGroups] = useState<Group[]>([]);
   const [settledGroups, setSettledGroups] = useState<Group[]>([]);
   const [showSettled, setShowSettled] = useState(false);
@@ -32,6 +36,15 @@ export const GroupsPage: React.FC = () => {
 
   // Create Group Form States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-group') {
+      setIsCreateOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('action');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [groupName, setGroupName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -72,6 +85,7 @@ export const GroupsPage: React.FC = () => {
       });
       setGroupName('');
       setIsCreateOpen(false);
+      toast.success(`Group "${created.name}" created successfully.`);
       // Redirect straight to new group page
       navigate(`/groups/${created.id}`);
     } catch (err: any) {
@@ -84,15 +98,12 @@ export const GroupsPage: React.FC = () => {
   const groupsToDisplay = showSettled ? settledGroups : activeGroups;
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border pb-4 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight">Shared Groups</h1>
-          <p className="text-sm text-text-secondary">Split expenses and track balances with friends and travel companions.</p>
-        </div>
-
-        <div className="flex gap-2">
+    <PageShell>
+      <PageHeader
+        title="Shared Groups"
+        description="Split expenses and track balances with friends and travel companions."
+        actions={
+          <>
           <Button 
             variant="outline" 
             onClick={() => setShowSettled(!showSettled)}
@@ -152,33 +163,34 @@ export const GroupsPage: React.FC = () => {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {error && (
-        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm">
-          {error}
-        </div>
+        <StateBlock type="error" title="Groups error" description={error} />
       )}
 
       {loading ? (
-        <div className="py-12 text-center text-text-secondary text-sm">Loading groups...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-[148px] w-full rounded-xl animate-pulse" />
+          <Skeleton className="h-[148px] w-full rounded-xl animate-pulse" />
+          <Skeleton className="h-[148px] w-full rounded-xl animate-pulse" />
+        </div>
       ) : groupsToDisplay.length === 0 ? (
-        <div className="py-16 text-center text-text-secondary text-sm border border-dashed border-border rounded-lg bg-surface">
-          <p className="font-semibold text-text-primary mb-1">
-            {showSettled ? 'No settled groups found.' : 'No active groups.'}
-          </p>
-          <p className="text-xs max-w-sm mx-auto mb-4 text-text-secondary">
-            {showSettled 
+        <StateBlock
+          title={showSettled ? 'No settled groups found' : 'No active groups'}
+          description={
+            showSettled 
               ? 'Groups move here once all settlements are paid and completed.' 
-              : 'Create a shared group and add your friends to split expenses.'}
-          </p>
-          {!showSettled && (
+              : 'Shared groups let you split expenses (like trip costs, rent, or dinner) with friends, track who paid, and settle up balances easily.'
+          }
+          action={!showSettled && (
             <Button onClick={() => setIsCreateOpen(true)} size="sm">
-              Create a Group
+              Create your first group
             </Button>
           )}
-        </div>
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groupsToDisplay.map((group) => (
@@ -194,15 +206,7 @@ export const GroupsPage: React.FC = () => {
                     {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
                   </span>
                 </div>
-                {group.isSettled ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-success/15 text-success font-mono">
-                    SETTLED
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-warning/15 text-warning font-mono">
-                    ACTIVE
-                  </span>
-                )}
+                <StatusBadge tone={group.isSettled ? 'success' : 'warning'}>{group.isSettled ? 'SETTLED' : 'ACTIVE'}</StatusBadge>
               </div>
 
               <div className="text-xs text-text-secondary border-t border-border pt-3 mt-auto">
@@ -215,7 +219,7 @@ export const GroupsPage: React.FC = () => {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 };
 

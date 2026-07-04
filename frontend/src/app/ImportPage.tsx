@@ -7,6 +7,10 @@ import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { PageHeader, PageShell, StateBlock } from './shared';
+import { Skeleton } from '../components/ui/skeleton';
+import { FullPageError } from '../components/ErrorDisplay';
+import { toast } from 'sonner';
 
 interface Account {
   id: string;
@@ -42,7 +46,12 @@ interface ParseSummary {
 
 type RowResult = { success: boolean; error?: string };
 
-const toDateInput = (value: string) => new Date(value).toISOString().slice(0, 10);
+const toDateInput = (value: string | null | undefined) => {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  return d.toISOString().slice(0, 10);
+};
 
 export const ImportPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -113,10 +122,12 @@ export const ImportPage: React.FC = () => {
 
     if (!selectedAccountId) {
       setError('Please select an account.');
+      toast.error('Please select an account.');
       return;
     }
     if (!file) {
       setError('Please choose a CSV or PDF statement.');
+      toast.error('Please choose a CSV or PDF statement.');
       return;
     }
 
@@ -139,9 +150,11 @@ export const ImportPage: React.FC = () => {
 
       setSummary(data.summary);
       setFile(null);
+      toast.success('Bank statement uploaded and parsed successfully.');
       await loadImports();
     } catch (err: any) {
       setError(err.message || 'Upload failed.');
+      toast.error(err.message || 'Upload failed.');
     } finally {
       setUploading(false);
     }
@@ -174,6 +187,7 @@ export const ImportPage: React.FC = () => {
       await saveRow(item);
       await apiClient(`/imports/${item.id}/confirm`, { method: 'POST' });
       setRowResults((current) => ({ ...current, [item.id]: { success: true } }));
+      toast.success('Staged transaction confirmed successfully.');
       setSelectedIds((current) => {
         const next = new Set(current);
         next.delete(item.id);
@@ -181,6 +195,7 @@ export const ImportPage: React.FC = () => {
       });
       await Promise.all([loadLookups(), loadImports()]);
     } catch (err: any) {
+      toast.error(err.message || 'Failed to confirm transaction.');
       setRowResults((current) => ({ ...current, [item.id]: { success: false, error: err.message || 'Confirm failed.' } }));
     }
   };
@@ -189,8 +204,10 @@ export const ImportPage: React.FC = () => {
     try {
       await apiClient(`/imports/${id}/reject`, { method: 'POST' });
       setRowResults((current) => ({ ...current, [id]: { success: true } }));
+      toast.success('Staged transaction rejected.');
       await loadImports();
     } catch (err: any) {
+      toast.error(err.message || 'Failed to reject transaction.');
       setRowResults((current) => ({ ...current, [id]: { success: false, error: err.message || 'Reject failed.' } }));
     }
   };
@@ -202,6 +219,7 @@ export const ImportPage: React.FC = () => {
     const invalid = imports.find((item) => selectedIds.has(item.id) && !item.suggestedCategoryId);
     if (invalid) {
       setError('Every selected row needs a category before bulk confirm.');
+      toast.error('Every selected row needs a category before bulk confirm.');
       return;
     }
 
@@ -209,25 +227,42 @@ export const ImportPage: React.FC = () => {
     setError(null);
     const nextResults: Record<string, RowResult> = {};
 
+    let successCount = 0;
+    let failCount = 0;
+
     for (const item of imports.filter((entry) => selectedIds.has(entry.id))) {
       try {
         await saveRow(item);
         await apiClient(`/imports/${item.id}/confirm`, { method: 'POST' });
         nextResults[item.id] = { success: true };
+        successCount++;
       } catch (err: any) {
         nextResults[item.id] = { success: false, error: err.message || 'Confirm failed.' };
+        failCount++;
       }
     }
 
-    try {
-      setRowResults(nextResults);
-      setSelectedIds(new Set());
-      await Promise.all([loadLookups(), loadImports()]);
-    } catch (err: any) {
-      setError(err.message || 'Failed to refresh imports after bulk confirm.');
-    } finally {
-      setBulkSaving(false);
+    setRowResults((current) => ({ ...current, ...nextResults }));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (nextResults[id]?.success) {
+          next.delete(id);
+        }
+      }
+      return next;
+    });
+
+    setBulkSaving(false);
+
+    if (successCount > 0) {
+      toast.success(`Successfully confirmed ${successCount} transactions.`);
     }
+    if (failCount > 0) {
+      toast.error(`Failed to confirm ${failCount} transactions.`);
+    }
+
+    await Promise.all([loadLookups(), loadImports()]);
   };
 
   const toggleAll = () => {
@@ -244,19 +279,19 @@ export const ImportPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Statement Import</h1>
-          <p className="text-sm text-text-secondary mt-1">Stage bank statement rows for review before creating expenses.</p>
-        </div>
-        <Button variant="outline" className="gap-2" onClick={refresh}>
-          <RefreshCcw className="h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Statement Import"
+        description="Stage bank statement rows for review before creating expenses."
+        actions={
+          <Button variant="outline" className="gap-2" onClick={refresh}>
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </Button>
+        }
+      />
 
-      {error && <div className="p-3 rounded border border-danger bg-danger/10 text-danger text-sm">{error}</div>}
+      {error && <FullPageError title="Failed to Load Imports" description={error} onRetry={refresh} />}
       {summary && (
         <div className="p-3 rounded border border-success bg-success/10 text-success text-sm">
           {summary.message}
@@ -306,9 +341,16 @@ export const ImportPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="py-10 text-center text-text-secondary text-sm">Loading imports...</div>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-[96px] w-full rounded-lg animate-pulse" />
+            <Skeleton className="h-[96px] w-full rounded-lg animate-pulse" />
+            <Skeleton className="h-[96px] w-full rounded-lg animate-pulse" />
+          </div>
         ) : imports.length === 0 ? (
-          <div className="py-10 text-center text-text-secondary text-sm">No pending imports. Upload a statement to begin.</div>
+          <StateBlock 
+            title="No pending imports" 
+            description="Importing statements lets you parse transactions from your bank statements to review, categorize, and confirm them as real expenses in bulk." 
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {imports.map((item) => {
@@ -404,7 +446,7 @@ export const ImportPage: React.FC = () => {
           </div>
         )}
       </Card>
-    </div>
+    </PageShell>
   );
 };
 

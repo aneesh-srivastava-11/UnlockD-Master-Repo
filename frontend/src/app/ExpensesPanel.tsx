@@ -5,6 +5,9 @@ import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Skeleton } from '../components/ui/skeleton';
+import { StateBlock } from './shared';
+import { toast } from 'sonner';
 
 export interface Account {
   id: string;
@@ -54,6 +57,30 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+
+  // Pre-select account and category smart defaults
+  React.useEffect(() => {
+    if (accounts.length > 0 && !selectedAccountId) {
+      const defAcc = accounts[0].id;
+      setSelectedAccountId(defAcc);
+      const storedCat = localStorage.getItem(`financista_last_expense_category_${defAcc}`);
+      if (storedCat && categories.find(c => c.id === storedCat)) {
+        setSelectedCategoryId(storedCat);
+      } else if (categories.length > 0) {
+        setSelectedCategoryId(categories[0].id);
+      }
+    }
+  }, [accounts, categories, selectedAccountId]);
+
+  const handleAccountChange = (accId: string) => {
+    setSelectedAccountId(accId);
+    const storedCat = localStorage.getItem(`financista_last_expense_category_${accId}`);
+    if (storedCat && categories.find(c => c.id === storedCat)) {
+      setSelectedCategoryId(storedCat);
+    } else if (categories.length > 0) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  };
   
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -100,7 +127,11 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
         }
       });
 
+      // Save category choice to localStorage for this account
+      localStorage.setItem(`financista_last_expense_category_${selectedAccountId}`, selectedCategoryId);
+
       setFormSuccess('Expense recorded successfully!');
+      toast.success('Expense recorded successfully.');
       setAmount('');
       setDescription('');
       
@@ -108,6 +139,7 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
       onRefresh();
     } catch (err: any) {
       setFormError(err.message || 'Failed to record expense.');
+      toast.error(err.message || 'Failed to record expense.');
     } finally {
       setIsCreating(false);
     }
@@ -155,9 +187,11 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
       });
 
       setEditingId(null);
+      toast.success('Expense updated successfully.');
       onRefresh();
     } catch (err: any) {
       setEditError(err.message || 'Failed to update expense.');
+      toast.error(err.message || 'Failed to update expense.');
     } finally {
       setIsSaving(false);
     }
@@ -173,9 +207,10 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
       await apiClient(`/expenses/${id}`, {
         method: 'DELETE'
       });
+      toast.success('Expense deleted successfully.');
       onRefresh();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete expense.');
+      toast.error(err.message || 'Failed to delete expense.');
     }
   };
 
@@ -197,7 +232,7 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
               <Label htmlFor="expense-account">Account</Label>
               <Select
                 value={selectedAccountId}
-                onValueChange={setSelectedAccountId}
+                onValueChange={handleAccountChange}
                 disabled={isCreating}
               >
                 <SelectTrigger id="expense-account">
@@ -279,9 +314,16 @@ export const ExpensesPanel: React.FC<ExpensesPanelProps> = ({
         </div>
 
         {loading ? (
-          <div className="py-8 text-center text-text-secondary text-sm">Loading expenses...</div>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-[74px] w-full rounded-lg animate-pulse" />
+            <Skeleton className="h-[74px] w-full rounded-lg animate-pulse" />
+            <Skeleton className="h-[74px] w-full rounded-lg animate-pulse" />
+          </div>
         ) : expenses.length === 0 ? (
-          <div className="py-8 text-center text-text-secondary text-sm">No expenses logged for this month.</div>
+          <StateBlock 
+            title="No expenses logged this month" 
+            description="Log your daily transactions here. Recording an expense will automatically deduct the amount from your selected account balance." 
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {expenses.map((expense) => {

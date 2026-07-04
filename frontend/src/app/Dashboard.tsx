@@ -9,6 +9,8 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { MetricCard, PageHeader, PageShell, StateBlock, StatusBadge } from './shared';
+import { Skeleton } from '../components/ui/skeleton';
+import { toast } from 'sonner';
 
 interface Account {
   id: string;
@@ -83,6 +85,16 @@ export const Dashboard: React.FC = () => {
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
 
+  // Recipient search states
+  const [recipientSearchQuery, setRecipientSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearchingRecipients, setIsSearchingRecipients] = useState(false);
+  const [showResultsDropdown, setShowResultsDropdown] = useState(false);
+
+  // Activity & Insights Tab states
+  const [activeTab, setActiveTab] = useState<'recent' | 'budgets' | 'queue'>('recent');
+  const [expandedInsights, setExpandedInsights] = useState(false);
+
   // Helper to generate a unique idempotency key
   const generateIdempotencyKey = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -116,9 +128,13 @@ export const Dashboard: React.FC = () => {
       const data = await apiClient<Account[]>('/accounts');
       setAccounts(data);
       if (data.length > 0) {
+        const storedFrom = localStorage.getItem('financista_last_transfer_from');
+        const matchedFrom = storedFrom && data.find(a => a.id === storedFrom);
+        const defaultFrom = matchedFrom ? matchedFrom.id : data[0].id;
+
         if (autoSelect || !selectedAccountId) {
           setSelectedAccountId(data[0].id);
-          setFromAccountId(data[0].id);
+          setFromAccountId(defaultFrom);
         }
       } else {
         setSelectedAccountId('');
@@ -162,6 +178,53 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Recurring Suggestions State
+  interface RecurringSuggestion {
+    id: string;
+    accountId: string;
+    merchant: string;
+    suggestedAmount: string;
+    categoryId: string | null;
+    suggestedDate: string;
+    status: string;
+    account: { id: string; name: string; balance: string };
+    category: { id: string; name: string } | null;
+  }
+  const [suggestions, setSuggestions] = useState<RecurringSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  const fetchSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const data = await apiClient<RecurringSuggestion[]>('/recurring-suggestions/check');
+      setSuggestions(data);
+    } catch (err) {
+      console.error('Failed to load recurring suggestions:', err);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleConfirmSuggestion = async (id: string) => {
+    try {
+      await apiClient(`/recurring-suggestions/${id}/confirm`, { method: 'POST' });
+      toast.success('Recurring expense recorded successfully.');
+      await handleRefreshAll();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to log recurring expense.');
+    }
+  };
+
+  const handleRejectSuggestion = async (id: string) => {
+    try {
+      await apiClient(`/recurring-suggestions/${id}/reject`, { method: 'POST' });
+      toast.success('Recurring suggestion dismissed.');
+      await handleRefreshAll();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to dismiss recurring suggestion.');
+    }
+  };
+
   const fetchOverviewData = async () => {
     setOverviewError(null);
     try {
@@ -185,6 +248,7 @@ export const Dashboard: React.FC = () => {
     }
     await fetchExtraData();
     await fetchOverviewData();
+    await fetchSuggestions();
   };
 
   // Initial load
@@ -192,6 +256,7 @@ export const Dashboard: React.FC = () => {
     fetchAccounts(true);
     fetchExtraData();
     fetchOverviewData();
+    fetchSuggestions();
     setIdempotencyKey(generateIdempotencyKey());
   }, []);
 
@@ -203,6 +268,39 @@ export const Dashboard: React.FC = () => {
       setTransactions([]);
     }
   }, [selectedAccountId]);
+
+  // Debounced search logic for transfer recipient
+  useEffect(() => {
+    if (recipientSearchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Skip query if it contains parenthesized account name (means selection has been made)
+    if (recipientSearchQuery.includes('(') && recipientSearchQuery.includes(')')) {
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearchingRecipients(true);
+      try {
+        const token = localStorage.getItem('unlockd_auth_token');
+        const response = await fetch(`http://localhost:3000/users/search?q=${encodeURIComponent(recipientSearchQuery)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error('Failed to search recipients:', err);
+      } finally {
+        setIsSearchingRecipients(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [recipientSearchQuery]);
 
   // Handle account creation
   const handleCreateAccount = async (e: React.FormEvent) => {
@@ -234,6 +332,7 @@ export const Dashboard: React.FC = () => {
 
       setNewAccountName('');
       setNewAccountBalance('');
+      toast.success(`Account "${created.name}" created successfully.`);
 
       // Reload accounts and select the new one
       await fetchAccounts(false);
@@ -241,6 +340,7 @@ export const Dashboard: React.FC = () => {
       setFromAccountId(created.id);
     } catch (err: any) {
       setCreateAccountError(err.message || 'Failed to create account.');
+      toast.error(err.message || 'Failed to create account.');
     } finally {
       setIsCreatingAccount(false);
     }
@@ -289,10 +389,14 @@ export const Dashboard: React.FC = () => {
 
       if (result.status === 'FAILED') {
         setTransferError('Transfer failed: Insufficient funds or processing issue.');
+        toast.error('Transfer failed: Insufficient funds or processing issue.');
       } else {
         setTransferSuccess(`Successfully transferred ₹${amountNum.toFixed(2)}.`);
+        toast.success(`Successfully transferred ₹${amountNum.toFixed(2)}.`);
+        localStorage.setItem('financista_last_transfer_from', fromAccountId);
         setToAccountId('');
         setTransferAmount('');
+        setRecipientSearchQuery('');
       }
 
       // Reset idempotency key for the next transfer
@@ -304,8 +408,10 @@ export const Dashboard: React.FC = () => {
       // If server returned 400 Bad Request with a FAILED transaction (overdraft)
       if (err instanceof ApiError && err.data?.transaction) {
         setTransferError(`Transfer failed: ${err.message}`);
+        toast.error(`Transfer failed: ${err.message}`);
       } else {
         setTransferError(err.message || 'An unexpected error occurred during transfer.');
+        toast.error(err.message || 'An unexpected error occurred during transfer.');
       }
       // Reset key to prevent resubmitting the failed request
       setIdempotencyKey(generateIdempotencyKey());
@@ -328,91 +434,282 @@ export const Dashboard: React.FC = () => {
         <StateBlock type="error" title="Overview error" description={overviewError} />
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <MetricCard label="Total Balance" value={`Rs ${totalBalance.toFixed(2)}`} detail={`${accounts.length} account${accounts.length === 1 ? '' : 's'}`} />
-        <MetricCard label="Budget Watch" value={budgetRisk.length} detail="categories closest to limit" />
-        <MetricCard label="Active Groups" value={activeGroups.length} detail={<Link to="/groups" className="text-accent">Open groups</Link>} />
-        <MetricCard label="Recent Activity" value={recentRecords.length} detail={<Link to="/history" className="text-accent">View history</Link>} />
-        <MetricCard label="Pending Imports" value={pendingImports.length} detail={<Link to="/imports" className="text-accent">Review imports</Link>} />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="p-4 flex flex-col gap-3 min-w-0">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-            <h2 className="text-lg font-semibold">Budget Risk</h2>
-            <Link to="/#budgets" className="text-xs text-accent font-semibold">Budgets</Link>
+      {loadingAccounts ? (
+        <div className="flex flex-col gap-5">
+          <Skeleton className="h-[130px] w-full rounded-xl animate-pulse" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Skeleton className="h-[108px] w-full rounded-xl animate-pulse" />
+            <Skeleton className="h-[108px] w-full rounded-xl animate-pulse" />
+            <Skeleton className="h-[108px] w-full rounded-xl animate-pulse" />
+            <Skeleton className="h-[108px] w-full rounded-xl animate-pulse" />
           </div>
-          {budgetRisk.length === 0 ? (
-            <StateBlock title="No budget limits yet" description="Create categories and limits to track spending pressure." />
-          ) : (
-            <div className="flex flex-col gap-3">
-              {budgetRisk.map((budget: any) => (
-                <div key={budget.id || budget.categoryId} className="min-w-0">
-                  <div className="flex justify-between gap-3 text-sm">
-                    <span className="truncate font-semibold" title={budget.categoryName || budget.category?.name}>{budget.categoryName || budget.category?.name || 'Category'}</span>
-                    <span className="font-mono text-text-secondary shrink-0">{Math.round(budget.utilization * 100)}%</span>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {/* Large, visually dominant Total Balance Hero Card */}
+          <Card className="p-6 bg-surface border-l-4 border-accent relative overflow-hidden flex flex-col justify-between min-h-[130px] shadow-lg shadow-accent/5">
+            <div>
+              <div className="text-xs font-bold text-text-secondary tracking-wide">Total Balance</div>
+              <div className="mt-3 text-3xl sm:text-4xl font-extrabold text-text-primary font-mono tracking-tight">
+                Rs {totalBalance.toFixed(2)}
+              </div>
+            </div>
+            <div className="mt-4 text-xs text-text-secondary flex items-center gap-1.5 border-t border-border/40 pt-3">
+              <span className="w-2 h-2 rounded-full bg-success/80 inline-block animate-pulse"></span>
+              Active across {accounts.length} account{accounts.length === 1 ? '' : 's'}
+            </div>
+          </Card>
+
+          {/* Smaller, secondary stats row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard label="Budget Watch" value={budgetRisk.length} detail="categories closest to limit" />
+            <MetricCard label="Active Groups" value={activeGroups.length} detail={<Link to="/groups" className="text-accent hover:underline">Open groups</Link>} />
+            <MetricCard label="Recent Activity" value={recentRecords.length} detail={<Link to="/history" className="text-accent hover:underline">View history</Link>} />
+            <MetricCard label="Pending Imports" value={pendingImports.length} detail={<Link to="/imports" className="text-accent hover:underline">Review imports</Link>} />
+          </div>
+        </div>
+      )}
+
+      {/* Activity & Insights unified panel */}
+      <Card className="p-6 flex flex-col gap-4 min-w-0 shadow-sm border border-border bg-surface">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-border pb-4">
+          <h2 className="text-lg font-bold text-text-primary">Activity & Insights</h2>
+          <div className="flex bg-surface-elevated p-1 rounded-lg border border-border/80">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('recent'); setExpandedInsights(false); }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'recent' 
+                  ? 'bg-accent text-white shadow' 
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Recent Activity
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('budgets'); setExpandedInsights(false); }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'budgets' 
+                  ? 'bg-accent text-white shadow' 
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Budget Risk
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('queue'); setExpandedInsights(false); }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'queue' 
+                  ? 'bg-accent text-white shadow' 
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Action Queue
+            </button>
+          </div>
+        </div>
+
+        {/* Recurring suggestions inline review block */}
+        {loadingSuggestions ? (
+          <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 flex flex-col gap-3">
+            <div className="flex justify-between items-center border-b border-accent/10 pb-2">
+              <Skeleton className="h-4 w-1/3 rounded animate-pulse" />
+              <Skeleton className="h-4 w-12 rounded-full animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <Skeleton className="h-[120px] w-full rounded-lg animate-pulse" />
+              <Skeleton className="h-[120px] w-full rounded-lg animate-pulse" />
+            </div>
+          </div>
+        ) : suggestions.length > 0 ? (
+          <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 flex flex-col gap-3 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center border-b border-accent/10 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent animate-ping shrink-0" />
+                <h3 className="text-sm font-bold text-text-primary">Detected Recurring Expenses</h3>
+              </div>
+              <span className="text-[10px] text-accent font-semibold uppercase tracking-wider bg-accent/10 px-2 py-0.5 rounded-full font-sans">
+                {suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {suggestions.map((suggestion) => (
+                <div key={suggestion.id} className="bg-surface border border-border rounded-lg p-3.5 flex flex-col gap-3 shadow-sm hover:border-accent/40 transition-colors">
+                  <div className="flex justify-between items-start gap-2.5">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-text-primary truncate" title={suggestion.merchant}>
+                        {suggestion.merchant}
+                      </div>
+                      <div className="text-[11px] text-text-secondary mt-0.5">
+                        Suggested for {new Date(suggestion.suggestedDate).toLocaleDateString()}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[10px] bg-surface-elevated border border-border px-2 py-0.5 rounded text-text-primary font-medium">
+                          Account: {suggestion.account.name}
+                        </span>
+                        {suggestion.category && (
+                          <span className="text-[10px] bg-accent/10 border border-accent/20 px-2 py-0.5 rounded text-accent font-medium">
+                            {suggestion.category.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm font-bold text-danger shrink-0">
+                      -₹{parseFloat(suggestion.suggestedAmount).toFixed(2)}
+                    </span>
                   </div>
-                  <div className="mt-2 h-2 rounded bg-background border border-border overflow-hidden">
-                    <div className="h-full bg-accent transition-all duration-200" style={{ width: `${Math.min(100, budget.utilization * 100)}%` }} />
+                  
+                  <div className="flex gap-2 border-t border-border/40 pt-2.5 mt-1">
+                    <Button
+                      onClick={() => handleConfirmSuggestion(suggestion.id)}
+                      className="h-8 text-xs font-semibold px-4 flex-grow bg-accent hover:bg-accent/90"
+                    >
+                      Log Expense
+                    </Button>
+                    <Button
+                      onClick={() => handleRejectSuggestion(suggestion.id)}
+                      variant="outline"
+                      className="h-8 text-xs font-semibold px-3 text-text-secondary hover:text-text-primary"
+                    >
+                      Dismiss
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </Card>
-
-        <Card className="p-4 flex flex-col gap-3 min-w-0">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-            <h2 className="text-lg font-semibold">Recent Activity</h2>
-            <Link to="/history" className="text-xs text-accent font-semibold">Full history</Link>
           </div>
-          {recentRecords.length === 0 ? (
-            <StateBlock title="No activity yet" description="Transfers and expenses will appear here." />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {recentRecords.map((record) => (
-                <Link key={`${record.type}-${record.id}`} to={`/history?q=${encodeURIComponent(record.description || record.accountName || '')}`} className="rounded border border-border bg-background p-3 hover:border-text-secondary/40 transition-colors min-w-0">
-                  <div className="flex justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <StatusBadge tone={record.type === 'EXPENSE' ? 'warning' : 'accent'}>{record.type}</StatusBadge>
-                        <span className="text-xs text-text-secondary truncate">{new Date(record.date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="mt-1 text-sm truncate" title={record.description || record.accountName}>{record.description || record.accountName}</div>
-                    </div>
-                    <span className={`font-mono text-sm shrink-0 ${record.direction === 'IN' ? 'text-success' : 'text-danger'}`}>
-                      {record.direction === 'IN' ? '+' : '-'}Rs {record.amount.toFixed(2)}
-                    </span>
+        ) : null}
+
+        <div className="flex-1">
+          {activeTab === 'recent' && (
+            <div className="flex flex-col gap-3">
+              {recentRecords.length === 0 ? (
+                <StateBlock title="No activity yet" description="Transfers and expenses will appear here." />
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    {(expandedInsights ? recentRecords : recentRecords.slice(0, 3)).map((record) => (
+                      <Link 
+                        key={`${record.type}-${record.id}`} 
+                        to={`/history?q=${encodeURIComponent(record.description || record.accountName || '')}`} 
+                        className="rounded-lg border border-border/50 bg-background/50 p-3 hover:border-text-secondary/30 transition-colors flex justify-between items-center gap-3 min-w-0"
+                      >
+                        <div className="min-w-0 flex items-center gap-3">
+                          <StatusBadge tone={record.type === 'EXPENSE' ? 'warning' : 'accent'}>{record.type}</StatusBadge>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-text-primary truncate" title={record.description || record.accountName}>
+                              {record.description || record.accountName}
+                            </div>
+                            <div className="text-[10px] text-text-secondary mt-0.5">{new Date(record.date).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        <span className={`font-mono text-sm font-semibold shrink-0 ${record.direction === 'IN' ? 'text-success' : 'text-danger'}`}>
+                          {record.direction === 'IN' ? '+' : '-'}Rs {record.amount.toFixed(2)}
+                        </span>
+                      </Link>
+                    ))}
                   </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-4 flex flex-col gap-3 min-w-0">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-            <h2 className="text-lg font-semibold">Action Queue</h2>
-            <Link to="/imports" className="text-xs text-accent font-semibold">Imports</Link>
-          </div>
-          {pendingImports.length === 0 && activeGroups.length === 0 ? (
-            <StateBlock title="Nothing needs attention" description="Pending imports and active groups appear here." />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {pendingImports.length > 0 && (
-                <Link to="/imports" className="rounded border border-warning/30 bg-warning/10 p-3 text-warning text-sm font-semibold">
-                  {pendingImports.length} imported row{pendingImports.length === 1 ? '' : 's'} awaiting review
-                </Link>
+                  
+                  <div className="flex justify-between items-center mt-2 border-t border-border/30 pt-3">
+                    <Link to="/history" className="text-xs text-accent font-semibold hover:underline">Full history &rarr;</Link>
+                    {recentRecords.length > 3 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-xs text-text-secondary" 
+                        onClick={() => setExpandedInsights(!expandedInsights)}
+                      >
+                        {expandedInsights ? 'Show Less' : `Show More (${recentRecords.length - 3} more)`}
+                      </Button>
+                    )}
+                  </div>
+                </>
               )}
-              {activeGroups.slice(0, 3).map((group) => (
-                <Link key={group.id} to={`/groups/${group.id}`} className="rounded border border-border bg-background p-3 text-sm hover:border-text-secondary/40 transition-colors truncate" title={group.name}>
-                  Active group: {group.name}
-                </Link>
-              ))}
             </div>
           )}
-        </Card>
-      </div>
+
+          {activeTab === 'budgets' && (
+            <div className="flex flex-col gap-3">
+              {budgetRisk.length === 0 ? (
+                <StateBlock title="No budget limits yet" description="Create categories and limits to track spending pressure." />
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3">
+                    {(expandedInsights ? budgetRisk : budgetRisk.slice(0, 3)).map((budget: any) => (
+                      <div key={budget.id || budget.categoryId} className="min-w-0 rounded-lg border border-border/50 bg-background/50 p-3">
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="truncate font-semibold text-text-primary">{budget.categoryName || budget.category?.name || 'Category'}</span>
+                          <span className="font-mono text-xs text-text-secondary shrink-0">
+                            Rs {parseFloat(budget.spent || '0').toFixed(2)} / Rs {parseFloat(budget.monthlyLimit || '0').toFixed(2)} ({Math.round(budget.utilization * 100)}%)
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 rounded bg-background border border-border overflow-hidden">
+                          <div className={`h-full transition-all duration-200 ${budget.utilization > 1 ? 'bg-danger' : 'bg-accent'}`} style={{ width: `${Math.min(100, budget.utilization * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center mt-2 border-t border-border/30 pt-3">
+                    <a href="/#budgets" className="text-xs text-accent font-semibold hover:underline">Manage budgets &rarr;</a>
+                    {budgetRisk.length > 3 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-xs text-text-secondary" 
+                        onClick={() => setExpandedInsights(!expandedInsights)}
+                      >
+                        {expandedInsights ? 'Show Less' : `Show More (${budgetRisk.length - 3} more)`}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'queue' && (
+            <div className="flex flex-col gap-3">
+              {pendingImports.length === 0 && activeGroups.length === 0 ? (
+                <StateBlock title="Nothing needs attention" description="Pending imports and active groups appear here." />
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    {pendingImports.length > 0 && (
+                      <Link to="/imports" className="rounded-lg border border-warning/20 bg-warning/5 p-3 text-warning text-sm font-semibold flex justify-between items-center hover:bg-warning/10 transition-colors">
+                        <span>{pendingImports.length} imported row{pendingImports.length === 1 ? '' : 's'} awaiting review</span>
+                        <span className="text-xs underline">Review &rarr;</span>
+                      </Link>
+                    )}
+                    {(expandedInsights ? activeGroups : activeGroups.slice(0, 3)).map((group) => (
+                      <Link key={group.id} to={`/groups/${group.id}`} className="rounded-lg border border-border/50 bg-background/50 p-3 text-sm hover:border-text-secondary/30 transition-colors flex justify-between items-center gap-3 truncate" title={group.name}>
+                        <span className="text-text-primary font-semibold truncate">Active group: {group.name}</span>
+                        <span className="text-xs text-accent font-semibold underline shrink-0">Open &rarr;</span>
+                      </Link>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center mt-2 border-t border-border/30 pt-3">
+                    <Link to="/groups" className="text-xs text-accent font-semibold hover:underline">View all groups &rarr;</Link>
+                    {activeGroups.length > 3 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-xs text-text-secondary" 
+                        onClick={() => setExpandedInsights(!expandedInsights)}
+                      >
+                        {expandedInsights ? 'Show Less' : `Show More (${activeGroups.length - 3} more)`}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
         {/* Left column: Accounts List & Create Account & Budgets */}
@@ -433,7 +730,11 @@ export const Dashboard: React.FC = () => {
 
             <div className="min-h-[140px] flex flex-col justify-center">
               {loadingAccounts ? (
-                <div className="py-8 text-center text-text-secondary text-sm">Loading accounts...</div>
+                <div className="flex flex-col gap-2 w-full">
+                  <Skeleton className="h-[76px] w-full rounded-lg animate-pulse" />
+                  <Skeleton className="h-[76px] w-full rounded-lg animate-pulse" />
+                  <Skeleton className="h-[76px] w-full rounded-lg animate-pulse" />
+                </div>
               ) : accounts.length === 0 ? (
                 <div className="py-8 text-center text-text-secondary text-sm">No accounts found. Create one below to begin.</div>
               ) : (
@@ -553,16 +854,68 @@ export const Dashboard: React.FC = () => {
                     </Select>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="transfer-recipient-id">Recipient Account UUID</Label>
+                  <div className="relative flex flex-col gap-1.5">
+                    <Label htmlFor="transfer-recipient-search">Recipient Account Search</Label>
                     <Input
-                      id="transfer-recipient-id"
+                      id="transfer-recipient-search"
                       type="text"
-                      placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-                      value={toAccountId}
-                      onChange={(e) => setToAccountId(e.target.value)}
+                      placeholder="Type email to search users..."
+                      value={recipientSearchQuery}
+                      onChange={(e) => {
+                        setRecipientSearchQuery(e.target.value);
+                        setShowResultsDropdown(true);
+                        if (toAccountId) setToAccountId('');
+                      }}
+                      onFocus={() => setShowResultsDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowResultsDropdown(false), 200)}
                       disabled={isTransferring}
+                      autoComplete="off"
                     />
+                    <input type="hidden" name="toAccountId" value={toAccountId} />
+
+                    {showResultsDropdown && recipientSearchQuery.trim().length >= 2 && (
+                      <div className="absolute top-[100%] left-0 right-0 mt-1 bg-surface border border-border rounded-lg shadow-xl max-h-[220px] overflow-y-auto z-[60] p-1 flex flex-col gap-1">
+                        {isSearchingRecipients ? (
+                          <div className="p-3 text-xs text-text-secondary text-center">Searching registered users...</div>
+                        ) : searchResults.length === 0 ? (
+                          <div className="p-3 text-xs text-text-secondary text-center">No matching users found</div>
+                        ) : (
+                          searchResults.map((usr) => (
+                            <div key={usr.id} className="p-2 border-b border-border/30 last:border-b-0">
+                              <div className="text-xs font-semibold text-text-primary truncate">{usr.email}</div>
+                              {usr.accounts.length === 0 ? (
+                                <div className="text-[10px] text-text-disabled mt-1">No active accounts available</div>
+                              ) : (
+                                <div className="flex flex-col gap-1 mt-1">
+                                  {usr.accounts.map((acc: any) => (
+                                    <button
+                                      key={acc.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setToAccountId(acc.id);
+                                        setRecipientSearchQuery(`${usr.email} (${acc.name})`);
+                                        setShowResultsDropdown(false);
+                                      }}
+                                      className="text-left w-full text-[11px] text-accent font-semibold px-2 py-1 rounded bg-accent/5 hover:bg-accent/15 border border-accent/10 transition-colors flex justify-between items-center"
+                                    >
+                                      <span>Select wallet: {acc.name}</span>
+                                      <span className="font-mono text-[9px] text-text-secondary/70 truncate max-w-[120px]">{acc.id}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {toAccountId && (
+                      <div className="text-[11px] text-success flex items-center gap-1 mt-1 font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
+                        Recipient Account Set: <code className="text-[9px] bg-background px-1 rounded border border-border">{toAccountId}</code>
+                      </div>
+                    )}
                   </div>
                 </div>
 

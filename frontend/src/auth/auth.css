@@ -4,7 +4,11 @@
   align-items: center;
   justify-content: center;
   flex-grow: 1;
-  background: var(--bg);
+  background-color: var(--background);
+  background-image: 
+    radial-gradient(circle at center, transparent 0%, var(--background) 75%),
+    radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px;
   padding: 40px 20px;
 }
 
@@ -13,9 +17,10 @@
   max-width: 400px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 12px;
   padding: 32px;
   box-sizing: border-box;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
 }
 
 .auth-header {

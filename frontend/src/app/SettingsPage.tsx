@@ -5,6 +5,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { PageHeader, PageShell, StateBlock } from './shared';
+import { toast } from 'sonner';
 
 interface Category {
   id: string;
@@ -71,6 +73,7 @@ export const SettingsPage: React.FC = () => {
 
     if (!newCategoryName.trim()) {
       setCategoryError('Category name is required.');
+      toast.error('Category name is required.');
       return;
     }
 
@@ -82,10 +85,12 @@ export const SettingsPage: React.FC = () => {
       });
       setNewCategoryName('');
       setCategorySuccess('Category created successfully!');
+      toast.success('Category created successfully!');
       setIsAddCategoryOpen(false); // Close modal
       await fetchData();
     } catch (err: any) {
       setCategoryError(err.message || 'Failed to create category.');
+      toast.error(err.message || 'Failed to create category.');
     } finally {
       setIsCreatingCategory(false);
     }
@@ -97,15 +102,16 @@ export const SettingsPage: React.FC = () => {
     }
     setCategoryError(null);
     setCategorySuccess(null);
-
     try {
       await apiClient(`/categories/${id}`, {
         method: 'DELETE'
       });
       setCategorySuccess('Category deleted successfully!');
+      toast.success('Category deleted successfully!');
       await fetchData();
     } catch (err: any) {
       setCategoryError(err.message || 'Failed to delete category.');
+      toast.error(err.message || 'Failed to delete category.');
     }
   };
 
@@ -133,6 +139,7 @@ export const SettingsPage: React.FC = () => {
         // Update local limits and close dialog
         setLimits(prev => ({ ...prev, [categoryId]: '' }));
         setEditingCategory(null);
+        toast.success('Budget limit cleared successfully!');
         await fetchData();
       } catch (err: any) {
         if (err.status === 404) {
@@ -141,6 +148,7 @@ export const SettingsPage: React.FC = () => {
           setEditingCategory(null);
         } else {
           setBudgetError(err.message || 'Failed to clear budget limit.');
+          toast.error(err.message || 'Failed to clear budget limit.');
         }
       } finally {
         setIsSavingBudget(false);
@@ -167,29 +175,22 @@ export const SettingsPage: React.FC = () => {
       // Update limits and close dialog
       setLimits(prev => ({ ...prev, [categoryId]: numericLimit.toString() }));
       setEditingCategory(null);
+      toast.success('Budget limit saved successfully!');
       await fetchData();
     } catch (err: any) {
       setBudgetError(err.message || 'Failed to save budget limit.');
+      toast.error(err.message || 'Failed to save budget limit.');
     } finally {
       setIsSavingBudget(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
-      
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border pb-4 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight">Settings</h1>
-          <p className="text-sm text-text-secondary">Configure spending categories and standing monthly budget limits.</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader title="Settings" description="Configure spending categories and standing monthly budget limits." />
 
       {categoryError && (
-        <div className="p-4 rounded bg-danger/10 border border-danger text-danger text-sm">
-          {categoryError}
-        </div>
+        <StateBlock type="error" title="Settings error" description={categoryError} />
       )}
 
       {categorySuccess && (
@@ -254,9 +255,12 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {loading ? (
-            <div className="py-8 text-center text-text-secondary text-sm">Loading categories...</div>
+            <StateBlock type="loading" title="Loading categories..." />
           ) : categories.length === 0 ? (
-            <div className="py-8 text-center text-text-secondary text-sm">No custom categories created yet.</div>
+            <StateBlock 
+              title="No custom categories" 
+              description="Categories let you group your expenses (e.g. food, rent, entertainment) to track budgets and analyze spending habits. Add a category above to get started." 
+            />
           ) : (
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
               {categories.map(cat => (
@@ -264,7 +268,7 @@ export const SettingsPage: React.FC = () => {
                   key={cat.id} 
                   className="flex justify-between items-center p-3 rounded border border-border bg-background"
                 >
-                  <span className="font-semibold text-text-primary text-sm">{cat.name}</span>
+                  <span className="font-semibold text-text-primary text-sm truncate" title={cat.name}>{cat.name}</span>
                   <Button 
                     variant="outline" 
                     onClick={() => handleDeleteCategory(cat.id)}
@@ -285,9 +289,9 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {loading ? (
-            <div className="py-8 text-center text-text-secondary text-sm">Loading limits...</div>
+            <StateBlock type="loading" title="Loading limits..." />
           ) : categories.length === 0 ? (
-            <div className="py-8 text-center text-text-secondary text-sm">Create a category first to set budget limits.</div>
+            <StateBlock title="No categories yet" description="Create a category first to set budget limits." />
           ) : (
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
               {categories.map(cat => {
@@ -377,7 +381,7 @@ export const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </PageShell>
   );
 };
 

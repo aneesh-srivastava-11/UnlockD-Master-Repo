@@ -12,6 +12,8 @@ import settlementRoutes from './routes/settlementRoutes';
 import recordsRoutes from './routes/recordsRoutes';
 import importRoutes from './routes/importRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
+import userRoutes from './routes/userRoutes';
+import recurringSuggestionRoutes from './routes/recurringSuggestionRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +41,8 @@ app.use('/', settlementRoutes);
 app.use('/records', recordsRoutes);
 app.use('/imports', importRoutes);
 app.use('/analytics', analyticsRoutes);
+app.use('/users', userRoutes);
+app.use('/recurring-suggestions', recurringSuggestionRoutes);
 
 // Global Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
